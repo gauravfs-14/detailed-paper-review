@@ -1,0 +1,727 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Paper Review</title>
+<link rel="stylesheet" href="vendor/fonts.css">
+<link rel="stylesheet" href="vendor/phosphor.css">
+<style>
+/* Design read: audit console for an author checking their own manuscript. Trust-first, calm,
+   one thing at a time. Native CSS + vanilla JS. One accent (cobalt). Severity and verdict colors
+   are semantic states only. Dials: variance 3, motion 3, density 5. */
+:root{
+  --bg:#f5f6f8; --surface:#ffffffe6; --panel:#fdfdfe; --sunken:#f0f2f5; --line:#e3e6eb; --line-2:#d2d7de;
+  --text:#14161b; --text-2:#4b5262; --text-3:#7c8494;
+  --accent:#2a55c7; --accent-2:#e8eefb; --on-accent:#fff;
+  --crit:#b42318; --crit-bg:#fdeceb; --major:#9a5a00; --major-bg:#fcf2e2; --minor:#475467; --minor-bg:#eef1f5;
+  --ok:#146c43; --ok-bg:#e6f4ec; --unk:#5f4fb0; --unk-bg:#efedfa;
+  --hl:rgba(255,196,0,.34); --hl-edge:#d99a00;
+  --r:12px; --r-sm:8px; --shadow:0 1px 2px rgba(20,22,27,.05),0 4px 16px rgba(20,22,27,.05);
+  --font:"Geist",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"Geist Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  --nav:248px; --head:56px; color-scheme:light;
+}
+:root[data-theme="dark"]{
+  --bg:#0d0f13; --surface:#12151ae6; --panel:#14171d; --sunken:#1a1e25; --line:#242932; --line-2:#323844;
+  --text:#e8eaef; --text-2:#a7aebb; --text-3:#717887;
+  --accent:#86a2ff; --accent-2:#1b2440; --on-accent:#0d0f13;
+  --crit:#ff8a7e; --crit-bg:#371714; --major:#efb45e; --major-bg:#30230e; --minor:#b7bfcd; --minor-bg:#20252e;
+  --ok:#62d29d; --ok-bg:#11281d; --unk:#bcb1f2; --unk-bg:#221e37;
+  --hl:rgba(255,200,40,.32); --hl-edge:#ffcc33; --shadow:0 1px 2px rgba(0,0,0,.4),0 6px 20px rgba(0,0,0,.3);
+  color-scheme:dark;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0d0f13; --surface:#12151ae6; --panel:#14171d; --sunken:#1a1e25; --line:#242932; --line-2:#323844;
+    --text:#e8eaef; --text-2:#a7aebb; --text-3:#717887;
+    --accent:#86a2ff; --accent-2:#1b2440; --on-accent:#0d0f13;
+    --crit:#ff8a7e; --crit-bg:#371714; --major:#efb45e; --major-bg:#30230e; --minor:#b7bfcd; --minor-bg:#20252e;
+    --ok:#62d29d; --ok-bg:#11281d; --unk:#bcb1f2; --unk-bg:#221e37;
+    --hl:rgba(255,200,40,.32); --hl-edge:#ffcc33; --shadow:0 1px 2px rgba(0,0,0,.4),0 6px 20px rgba(0,0,0,.3);
+    color-scheme:dark;
+  }
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--text);font:14px/1.55 var(--font);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+a{color:var(--accent);text-decoration:none} a:hover{text-decoration:underline;text-underline-offset:2px}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
+.mono{font-family:var(--mono);font-size:12.5px;letter-spacing:-.01em}
+.t2{color:var(--text-2)} .t3{color:var(--text-3)}
+i.ph{font-size:16px;line-height:1;vertical-align:-2px}
+
+/* ---------- shell ---------- */
+.app{display:grid;grid-template-columns:var(--nav) minmax(0,1fr);grid-template-rows:var(--head) minmax(0,1fr);height:100dvh}
+header{grid-column:1/-1;display:flex;align-items:center;gap:12px;padding:0 16px 0 20px;border-bottom:1px solid var(--line);background:var(--surface);backdrop-filter:saturate(1.4) blur(8px);z-index:6}
+.brand{display:flex;align-items:center;gap:10px;min-width:0;flex:1}
+.brand .title{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.search{display:flex;align-items:center;gap:8px;height:34px;width:min(340px,34vw);padding:0 10px;border:1px solid var(--line);border-radius:9px;background:var(--panel)}
+.search input{flex:1;min-width:0;border:0;outline:0;background:transparent;color:var(--text);font:inherit}
+.search:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-2)}
+kbd{font:11px/18px var(--mono);padding:0 5px;border:1px solid var(--line-2);border-bottom-width:2px;border-radius:5px;color:var(--text-3)}
+.ibtn{display:inline-grid;place-items:center;width:34px;height:34px;flex:none;border:1px solid var(--line);border-radius:9px;background:var(--panel);cursor:pointer}
+.ibtn:hover{background:var(--sunken)} .ibtn:active{transform:translateY(1px)}
+#menuBtn{display:none}
+nav{border-right:1px solid var(--line);background:var(--panel);overflow:auto;padding:12px 10px 28px}
+.nav-label{font-size:11.5px;font-weight:600;color:var(--text-3);padding:14px 10px 6px}
+.nav-item{display:grid;grid-template-columns:18px minmax(0,1fr) auto;gap:10px;align-items:center;min-height:34px;padding:6px 10px;border-radius:8px;color:var(--text);text-decoration:none}
+.nav-item span:nth-child(2){white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nav-item:hover{background:var(--sunken);text-decoration:none}
+.nav-item.on{background:var(--accent-2)}
+.nav-item .n{font:600 11.5px var(--mono);color:var(--crit)}
+.nav-item .n.quiet{color:var(--text-3);font-weight:500}
+.sdot{width:10px;height:10px;border-radius:50%;justify-self:center;box-shadow:inset 0 0 0 1.5px currentColor}
+.s-complete{color:var(--ok);background:var(--ok)} .s-incomplete{color:var(--major);background:linear-gradient(90deg,var(--major) 50%,transparent 50%)}
+.s-not_run{color:var(--text-3);background:transparent} .s-skipped{color:var(--text-3);background:var(--text-3)}
+main{overflow:auto;scroll-behavior:smooth}
+.page{max-width:1120px;margin:0 auto;padding:28px 32px 96px}
+
+/* ---------- type ---------- */
+h1{font-size:24px;line-height:1.25;letter-spacing:-.015em;font-weight:650;margin:0}
+h2{font-size:15px;font-weight:600;margin:32px 0 12px}
+h3{font-size:13px;font-weight:600;margin:0 0 8px;color:var(--text-2)}
+p{margin:0 0 10px}
+.lead{font-size:15px;color:var(--text-2);max-width:68ch}
+.crumbs{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-3);margin-bottom:10px}
+.crumbs a{color:var(--text-2)}
+
+/* ---------- surfaces ---------- */
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--r)}
+.pad{padding:20px 22px}
+.callout{display:grid;grid-template-columns:20px minmax(0,1fr);gap:12px;padding:12px 16px;border-radius:var(--r-sm);border:1px solid;margin:0 0 20px;font-size:13.5px}
+.callout i{font-size:18px;margin-top:1px}
+.callout.warn{background:var(--major-bg);border-color:color-mix(in srgb,var(--major) 28%,transparent)} .callout.warn i{color:var(--major)}
+.callout.bad{background:var(--crit-bg);border-color:color-mix(in srgb,var(--crit) 28%,transparent)} .callout.bad i{color:var(--crit)}
+.callout.good{background:var(--ok-bg);border-color:color-mix(in srgb,var(--ok) 28%,transparent)} .callout.good i{color:var(--ok)}
+.callout.info{background:var(--sunken);border-color:var(--line)} .callout.info i{color:var(--text-3)}
+
+/* ---------- pills ---------- */
+.pill{display:inline-flex;align-items:center;gap:5px;height:22px;padding:0 9px;border-radius:999px;font-size:12px;font-weight:550;white-space:nowrap}
+.sev-critical,.v-not_supported,.v-contradicted,.v-needs_fix,.m-not_found{background:var(--crit-bg);color:var(--crit)}
+.sev-major,.v-partial,.v-check,.m-close,.p-incomplete{background:var(--major-bg);color:var(--major)}
+.sev-minor{background:var(--minor-bg);color:var(--minor)}
+.sev-info,.p-not_run,.p-skipped{background:var(--sunken);color:var(--text-3)}
+.v-supported,.v-verified,.m-exact,.p-complete{background:var(--ok-bg);color:var(--ok)}
+.v-cannot_verify,.v-unverifiable{background:var(--unk-bg);color:var(--unk)}
+
+/* ---------- overview ---------- */
+.hero{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:16px}
+.verdict-label{font-size:12.5px;color:var(--text-3);font-weight:550}
+.verdict{font-size:30px;line-height:1.15;font-weight:700;letter-spacing:-.02em;margin:6px 0 10px}
+.vc-ready{color:var(--ok)} .vc-almost{color:var(--major)} .vc-not_ready{color:var(--crit)} .vc-unknown{color:var(--text-2)}
+.counts{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.count{display:inline-flex;align-items:baseline;gap:6px;padding:6px 10px;border-radius:8px;background:var(--sunken);font-size:12.5px;color:var(--text-2)}
+.count b{font:600 15px var(--mono);color:var(--text)}
+.count.c b{color:var(--crit)} .count.m b{color:var(--major)}
+.fixlist{list-style:none;margin:0;padding:0;counter-reset:f}
+.fixlist li{counter-increment:f;display:grid;grid-template-columns:26px minmax(0,1fr);gap:10px;padding:10px 0;border-top:1px solid var(--line)}
+.fixlist li:first-child{border-top:0;padding-top:2px}
+.fixlist li::before{content:counter(f);display:grid;place-items:center;width:22px;height:22px;border-radius:50%;font:600 12px var(--mono);background:var(--crit-bg);color:var(--crit)}
+.fixlist .why{color:var(--text-2);font-size:13px;margin-top:2px}
+.checklist{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 24px}
+.crow{display:grid;grid-template-columns:18px minmax(0,1fr) auto;gap:12px;align-items:center;min-height:46px;padding:8px 6px;border-top:1px solid var(--line);color:var(--text);text-decoration:none;border-radius:6px}
+.crow:hover{background:var(--sunken);text-decoration:none}
+.crow .nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500}
+.crow .rs{font-size:12.5px;color:var(--text-3);white-space:nowrap}
+.crow .rs b{color:var(--crit);font-weight:600} .crow .rs em{color:var(--major);font-style:normal;font-weight:600}
+.meter{height:5px;border-radius:9px;background:var(--sunken);overflow:hidden;min-width:80px}
+.meter i{display:block;height:100%;background:var(--ok);border-radius:inherit}
+.meter.part i{background:var(--major)}
+
+/* ---------- progressive disclosure ---------- */
+details.more{margin:12px 0 0}
+details.more>summary{list-style:none;display:inline-flex;align-items:center;gap:8px;height:30px;padding:0 12px;border:1px solid var(--line);border-radius:8px;background:var(--panel);font-size:13px;font-weight:550;color:var(--text-2);cursor:pointer;user-select:none}
+details.more>summary::-webkit-details-marker{display:none}
+details.more>summary::before{content:"";width:6px;height:6px;border-right:1.6px solid currentColor;border-bottom:1.6px solid currentColor;transform:rotate(-45deg);transition:transform .16s ease;margin-right:2px}
+details.more[open]>summary::before{transform:rotate(45deg) translate(-1px,-1px)}
+details.more>summary:hover{color:var(--text);border-color:var(--line-2)}
+details.more>.more-b{margin-top:12px}
+details.more.inline{margin:6px 0 0} details.more.inline>summary{height:26px;font-size:12.5px;background:transparent}
+
+/* ---------- page head ---------- */
+.phead{display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px 24px;margin-bottom:16px}
+.phead .grow{flex:1;min-width:260px}
+.covbox{display:grid;gap:6px;min-width:220px}
+.covbox .mono{color:var(--text-2)}
+.about{color:var(--text-2);margin:6px 0 0;max-width:70ch}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin:8px 0 18px;overflow-x:auto}
+.tab{height:38px;padding:0 12px;border:0;background:none;border-bottom:2px solid transparent;margin-bottom:-1px;color:var(--text-3);cursor:pointer;white-space:nowrap;font-weight:500}
+.tab:hover{color:var(--text)}
+.tab[aria-selected="true"]{color:var(--text);border-bottom-color:var(--accent)}
+.tab .mono{margin-left:6px;color:var(--text-3)}
+.ghead{display:flex;align-items:center;gap:8px;margin:20px 0 8px;font-size:13px;font-weight:600;color:var(--text-2)}
+.ghead:first-child{margin-top:0}
+
+/* ---------- rows ---------- */
+.list{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.item{position:relative;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:16px;align-items:center;padding:12px 16px 12px 20px;border-top:1px solid var(--line);cursor:pointer;outline:0}
+.item:first-child{border-top:0}
+.item::before{content:"";position:absolute;left:0;top:10px;bottom:10px;width:3px;border-radius:0 3px 3px 0;background:var(--bar,transparent)}
+.item:hover{background:var(--sunken)}
+.item.sel,.item:focus-visible{background:var(--accent-2)}
+.item .tt{font-weight:550;line-height:1.4;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.item .sub{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;margin-top:4px;font-size:12.5px;color:var(--text-3)}
+.item .side{display:flex;align-items:center;gap:10px;color:var(--text-3)}
+.bar-critical{--bar:var(--crit)} .bar-major{--bar:var(--major)} .bar-minor{--bar:var(--line-2)} .bar-info{--bar:var(--line)}
+.bar-ok{--bar:var(--ok)} .bar-unk{--bar:var(--unk)}
+.empty{display:grid;justify-items:center;gap:6px;padding:44px 20px;text-align:center;color:var(--text-2)}
+.empty i{font-size:26px;color:var(--text-3)}
+.empty .t3{max-width:52ch}
+
+/* ---------- tables ---------- */
+.tbl-wrap{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);overflow:auto}
+table.tbl{width:100%;border-collapse:collapse;font-size:13px}
+.tbl th{position:sticky;top:0;text-align:left;font-weight:600;font-size:12px;color:var(--text-3);padding:10px 14px;background:var(--panel);border-bottom:1px solid var(--line);white-space:nowrap}
+.tbl td{padding:10px 14px;border-top:1px solid var(--line);vertical-align:top}
+.tbl tr:first-child td{border-top:0}
+.tbl tr.go{cursor:pointer} .tbl tr.go:hover td{background:var(--sunken)}
+.tbl tr.sel td{background:var(--accent-2)}
+.tbl .bad{color:var(--crit);font-weight:550}
+
+/* ---------- drawer ---------- */
+.scrim{position:fixed;inset:var(--head) 0 0 0;background:rgba(12,14,18,.22);opacity:0;pointer-events:none;transition:opacity .18s ease;z-index:7}
+.scrim.on{opacity:1;pointer-events:auto}
+.drawer{position:fixed;top:var(--head);right:0;bottom:0;width:min(580px,94vw);display:flex;flex-direction:column;background:var(--panel);border-left:1px solid var(--line);box-shadow:var(--shadow);transform:translateX(102%);transition:transform .22s cubic-bezier(.16,1,.3,1);z-index:8}
+.drawer.on{transform:none}
+.dh{display:flex;align-items:center;gap:8px;height:52px;padding:0 12px 0 20px;border-bottom:1px solid var(--line)}
+.dh .grow{flex:1;font-weight:600;color:var(--text-2);font-size:13px}
+.db{overflow:auto;padding:20px 22px 48px}
+.db h2{font-size:18px;line-height:1.35;margin:10px 0 14px;letter-spacing:-.01em}
+.sect{margin:0 0 14px}
+.sect h4{margin:0 0 6px;font-size:12px;font-weight:600;color:var(--text-3)}
+.sect .body{white-space:pre-wrap}
+.fix{padding:12px 14px;border-radius:var(--r-sm);background:var(--accent-2);border:1px solid color-mix(in srgb,var(--accent) 22%,transparent)}
+.meta{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;color:var(--text-3);font-size:12.5px}
+.kv{display:grid;grid-template-columns:120px minmax(0,1fr);gap:6px 14px;font-size:13px;margin:0}
+.kv dt{color:var(--text-3)} .kv dd{margin:0}
+.ev-mini{padding:10px 12px;border:1px solid var(--line);border-radius:var(--r-sm);margin-top:8px;font-size:13px}
+.ev-mini .k{font-size:12px;color:var(--text-3);margin-bottom:4px}
+
+/* ---------- claim viewer ---------- */
+.claim{display:grid;grid-template-columns:minmax(0,1fr);gap:16px}
+.claim-top{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr);gap:20px}
+.ms{font-size:15px;line-height:1.65}
+.ms .ctx{color:var(--text-3)}
+.ms mark{background:var(--accent-2);color:var(--text);border-radius:3px;padding:1px 2px;box-shadow:inset 0 -2px 0 var(--accent)}
+.verdict-line{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:12px}
+.src{overflow:hidden}
+.src-h{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;padding:12px 16px;border-bottom:1px solid var(--line)}
+.src-h .grow{flex:1}
+.crop{position:relative;height:260px;overflow:hidden;background:#fff;border-bottom:1px solid var(--line);cursor:zoom-in}
+.crop.full{height:auto;max-height:none;cursor:zoom-out}
+.crop .pg{position:relative;width:100%}
+.crop img{display:block;width:100%;height:auto}
+.crop .box{position:absolute;background:var(--hl);outline:2px solid var(--hl-edge);border-radius:2px;mix-blend-mode:multiply}
+.crop .hint{position:absolute;right:10px;bottom:10px;display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px;border-radius:7px;background:rgba(20,22,27,.78);color:#fff;font-size:12px;pointer-events:none}
+.quote{padding:14px 16px;font-size:14px;line-height:1.7;border-bottom:1px solid var(--line)}
+.quote mark{background:var(--hl);color:var(--text);box-shadow:inset 0 -2px 0 var(--hl-edge);padding:1px 0}
+.quote .ctx{color:var(--text-2)}
+.src-f{display:flex;flex-wrap:wrap;gap:8px;padding:12px 16px}
+.btn{display:inline-flex;align-items:center;gap:7px;height:32px;padding:0 12px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--text);font-size:13px;font-weight:500;cursor:pointer;text-decoration:none;white-space:nowrap}
+.btn:hover{background:var(--sunken);text-decoration:none} .btn:active{transform:translateY(1px)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.btn.primary:hover{filter:brightness(1.05);background:var(--accent)}
+.pager{display:flex;gap:8px;margin-left:auto}
+
+/* ---------- misc ---------- */
+.reviewer h2{margin-top:0}
+.concern{padding:14px 0;border-top:1px solid var(--line)} .concern:first-of-type{border-top:0}
+.gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px}
+.gallery figure{margin:0;overflow:hidden}
+.gallery img{display:block;width:100%;aspect-ratio:4/3;object-fit:contain;background:#fff;border-bottom:1px solid var(--line)}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:16px 0}
+.stat{padding:14px 16px}
+.stat b{display:block;font:600 22px var(--mono)} .stat span{font-size:12.5px;color:var(--text-3)}
+.in{animation:in .2s cubic-bezier(.16,1,.3,1) both}
+@keyframes in{from{transform:translateY(3px)}to{transform:none}}
+@media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+
+/* ---------- responsive ---------- */
+@media (max-width:760px){ .claim-top{grid-template-columns:minmax(0,1fr)} }
+@media (max-width:1100px){
+  .app{grid-template-columns:minmax(0,1fr)}
+  #menuBtn{display:inline-grid}
+  nav{position:fixed;top:var(--head);bottom:0;left:0;width:280px;z-index:9;transform:translateX(-102%);transition:transform .2s cubic-bezier(.16,1,.3,1);box-shadow:var(--shadow)}
+  nav.open{transform:none}
+  .page{padding:24px 24px 80px}
+}
+@media (max-width:860px){ .hero,.checklist{grid-template-columns:minmax(0,1fr)} .stats{grid-template-columns:repeat(2,minmax(0,1fr))} .hide-md{display:none} }
+@media (max-width:640px){
+  .page{padding:18px 16px 72px} .search{width:auto;flex:1} .brand .vpill{display:none} .search kbd{display:none}
+  .item{grid-template-columns:minmax(0,1fr)} .item .side{justify-content:flex-start}
+  .kv{grid-template-columns:minmax(0,1fr)} .verdict{font-size:26px} h1{font-size:21px}
+  .brand{display:none}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <button class="ibtn" id="menuBtn" aria-label="Open navigation"><i class="ph ph-sidebar-simple"></i></button>
+    <div class="brand"><span class="title" id="paperTitle">Paper review</span><span class="vpill" id="verdictChip"></span></div>
+    <label class="search"><i class="ph ph-magnifying-glass t3"></i><input id="q" placeholder="Search findings, claims, references" autocomplete="off" aria-label="Search"><kbd>/</kbd></label>
+    <button class="ibtn" id="themeBtn" aria-label="Switch light or dark"><i class="ph ph-circle-half"></i></button>
+  </header>
+  <nav id="nav" aria-label="Review sections"></nav>
+  <main id="main"><div class="page" id="view"></div></main>
+</div>
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer" aria-hidden="true" aria-label="Details">
+  <div class="dh"><div class="grow" id="dTitle"></div>
+    <button class="ibtn" id="dPrev" aria-label="Previous (k)"><i class="ph ph-caret-up"></i></button>
+    <button class="ibtn" id="dNext" aria-label="Next (j)"><i class="ph ph-caret-down"></i></button>
+    <button class="ibtn" id="dClose" aria-label="Close (Esc)"><i class="ph ph-x"></i></button></div>
+  <div class="db" id="dBody"></div>
+</aside>
+<script src="data.js"></script>
+<script>
+(function(){
+"use strict";
+const D = window.REVIEW;
+const $ = s => document.querySelector(s);
+const view = $("#view"), nav = $("#nav"), main = $("#main");
+const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const store = {get(k,d){try{const v=localStorage.getItem("dpr:"+k);return v==null?d:JSON.parse(v)}catch(e){return d}},
+               set(k,v){try{localStorage.setItem("dpr:"+k,JSON.stringify(v))}catch(e){}}};
+if (!D) { view.innerHTML = '<div class="empty"><i class="ph ph-warning"></i><b>No review data found.</b><span class="t3">data.js is missing next to this page. Run build_dashboard.py.</span></div>'; return; }
+
+/* ---------- theme ---------- */
+const setTheme = t => { if (t) document.documentElement.dataset.theme = t; else delete document.documentElement.dataset.theme; };
+setTheme(store.get("theme", null));
+$("#themeBtn").onclick = () => { const cur = document.documentElement.dataset.theme || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+  const nx = cur === "dark" ? "light" : "dark"; setTheme(nx); store.set("theme", nx); };
+$("#menuBtn").onclick = () => nav.classList.toggle("open");
+
+/* ---------- vocabulary ---------- */
+const SEV = ["critical","major","minor","info"];
+const SEVL = {critical:"Critical", major:"Major", minor:"Minor", info:"Info"};
+const VL = {supported:"Supported", partial:"Partly supported", not_supported:"Not supported", contradicted:"Contradicts source",
+  cannot_verify:"Cannot verify", verified:"Verified", needs_fix:"Needs fix", check:"Check by hand", unverifiable:"Unverifiable"};
+const PL = {complete:"Done", incomplete:"Not finished", not_run:"Not run", skipped:"Skipped"};
+const ML = {exact:"Quote found in source", close:"Quote found (small text differences)", not_found:"Quote not in source"};
+const ABOUT = {
+  "01-references":"Every reference compared field by field with Crossref, OpenAlex and publisher records. The cited papers are saved for the fact check.",
+  "02-factcheck":"Every cited sentence compared with the saved text of the work it cites. Each verdict links to the exact passage.",
+  "03-consistency":"Numbers, terms and methods say the same thing everywhere in the paper.",
+  "04-methods-stats":"Study design, statistics, and every reported number, recomputed where the paper gives enough to do it.",
+  "04b-missing-reporting":"Statistics, metrics and statements a reviewer will expect but cannot find.",
+  "05-acronyms":"Each acronym defined once, at first use, and used the same way after that.",
+  "06-figures-tables":"Figures readable at print size and honest; tables grouped logically and ready to typeset.",
+  "07-crossrefs":"Every figure, table and box is referred to in the text, in order, where the reader needs it.",
+  "08-editorial":"What an editor checks before sending a paper to reviewers.",
+  "09-peer-review":"Independent expert reviewers, each with a different focus, who did not see each other's reports.",
+  "02b-uncited-claims":"Every sentence that cites nothing, checked for factual claims that need a source.",
+  "02c-literature":"Searched the literature for relevant work the paper does not cite, and checked how recent the references are.",
+  "02d-text-overlap":"Sentences that reuse a source's wording without quotation marks.",
+  "03b-claim-map":"Every headline claim traced to the table, figure or result that supports it.",
+  "04c-equations":"Every equation checked for correctness, defined symbols, and agreement with the source and the reported numbers.",
+  "R-revision":"The response to reviewers, the tracked-changes version and the revised manuscript checked against each other."
+};
+const SHORT = {"01-references":"References","02-factcheck":"Fact check","03-consistency":"Consistency","04-methods-stats":"Methods and statistics",
+  "04b-missing-reporting":"Missing reporting","05-acronyms":"Acronyms","06-figures-tables":"Figures and tables","07-crossrefs":"Cross-references",
+  "08-editorial":"Editorial check","09-peer-review":"Peer review","02b-uncited-claims":"Uncited claims",
+  "02c-literature":"Missing literature","02d-text-overlap":"Copied text","03b-claim-map":"Claims vs evidence","04c-equations":"Equations",
+  "R-revision":"Revision and response"};
+const pill = (cls, txt) => `<span class="pill ${cls}">${esc(txt)}</span>`;
+const sevPill = s => pill("sev-"+s, SEVL[s] || s);
+const vPill = v => pill("v-"+v, VL[v] || v);
+const pPill = s => pill("p-"+s, PL[s] || s);
+const vBar = v => ({supported:"bar-ok", verified:"bar-ok", partial:"bar-major", check:"bar-major", cannot_verify:"bar-unk", unverifiable:"bar-unk"}[v] || "bar-critical");
+const where = l => l ? [l.file ? l.file + (l.line ? ":" + l.line : "") : "", l.section || ""].filter(Boolean).join("  ") : "";
+const more = (label, inner, open, cls) => `<details class="more ${cls||""}"${open ? " open" : ""}><summary>${label}</summary><div class="more-b">${inner}</div></details>`;
+const capped = (rows, n, wrap) => { wrap = wrap || (x => `<div class="list">${x}</div>`);
+  return rows.length <= n ? wrap(rows.join("")) : wrap(rows.slice(0, n).join("")) + more(`Show ${rows.length - n} more`, wrap(rows.slice(n).join(""))); };
+
+const phases = D.phases || [];
+const byId = Object.fromEntries(phases.map(p => [p.phase, p]));
+const allF = phases.flatMap(p => (p.findings || []).map(f => ({...f, _p: p.phase})));
+const nSev = (fs, s) => fs.filter(f => f.severity === s).length;
+// one entry per real problem (the same problem found by several phases is merged by review_tool.py dedupe)
+const ISSUES = (D.issues || allF.map(f => ({severity: f.severity, title: f.title, what: f.what, location: f.location, phases: [f._p], findings: [{phase: f._p, id: f.id}]})));
+const issueOf = (pid, id) => ISSUES.find(i => i.findings.some(m => m.phase === pid && m.id === id));
+
+/* ---------- navigation ---------- */
+function renderNav(active){
+  const item = (href, lead, label, badge) => `<a class="nav-item${active === href ? " on" : ""}" href="#${href}">${lead}<span>${esc(label)}</span>${badge || "<span></span>"}</a>`;
+  let h = item("/overview", '<i class="ph ph-squares-four"></i>', "Overview");
+  h += `<div class="nav-label">Phases</div>`;
+  phases.forEach(p => { const c = nSev(p.findings || [], "critical"), m = nSev(p.findings || [], "major");
+    h += item("/phase/" + p.phase, `<span class="sdot s-${esc(p.status)}" title="${esc(PL[p.status] || p.status)}"></span>`, SHORT[p.phase] || p.title,
+      c ? `<span class="n" title="${c} critical">${c}</span>` : m ? `<span class="n quiet" title="${m} major">${m}</span>` : ""); });
+  h += `<div class="nav-label">Material</div>` + item("/sources", '<i class="ph ph-books"></i>', "Sources", `<span class="n quiet">${Object.keys(D.sources || {}).length}</span>`);
+  if (D.changes) h += item("/changes", '<i class="ph ph-pencil-simple-line"></i>', "Agent fixes", `<span class="n quiet">${D.changes.length}</span>`);
+  if (D.report_pdf) h += `<a class="nav-item" href="${esc(D.report_pdf)}" target="_blank" rel="noopener"><i class="ph ph-file-pdf"></i><span>PDF report</span><i class="ph ph-arrow-up-right t3"></i></a>`;
+  nav.innerHTML = h;
+}
+
+/* ---------- overview ---------- */
+function overview(){
+  const S = D.summary || {}, v = S.verdict || "unknown";
+  const vt = {ready:"Ready for submission", almost:"Almost ready", not_ready:"Not ready yet", unknown:"No verdict yet"}[v] || v;
+  const open = phases.filter(p => p.status !== "complete" && p.status !== "skipped");
+  let h = "";
+  if (open.length) h += `<div class="callout warn in"><i class="ph ph-hourglass-medium"></i><div><b>This review is not finished.</b> ${open.length} of ${phases.filter(p => p.status !== "skipped").length} phases are not complete, so their problems are not listed yet.
+      ${more("Which phases", open.map(p => `<div><a href="#/phase/${p.phase}">${esc(p.title)}</a> <span class="t3">${esc(PL[p.status])}</span></div>`).join(""), false, "inline")}</div></div>`;
+  else h += `<div class="callout good in"><i class="ph ph-check-circle"></i><div><b>Every phase is finished.</b> <span class="t2">Coverage is counted from the output files, not from what the agents said.</span></div></div>`;
+  const top = (S.top_problems && S.top_problems.length) ? S.top_problems : ISSUES.filter(f => f.severity === "critical").map(f => ({title: f.title, phase: f.findings[0].phase, id: f.findings[0].id}));
+  const li = t => `<li><div>${t.phase && t.id ? `<a href="#/finding/${esc(t.phase)}/${esc(t.id)}">${esc(t.title)}</a>` : esc(t.title || t)}${t.why ? `<div class="why">${esc(t.why)}</div>` : ""}</div></li>`;
+  const C = nSev(ISSUES, "critical"), M = nSev(ISSUES, "major"), m = nSev(ISSUES, "minor");
+  h += `<div class="hero in"><section class="panel pad"><div class="verdict-label">Verdict</div><div class="verdict vc-${esc(v)}">${esc(vt)}</div>
+      ${D.meta ? `<div class="meta" style="margin:-4px 0 10px">${D.meta.journal ? `<span>${esc(D.meta.journal)}</span>` : "<span>No target journal given</span>"}<span>${D.meta.submission === "revision" ? `Revision${D.meta.round ? " round " + esc(D.meta.round) : ""}` : "First submission"}</span>${D.meta.mode === "fix" ? "<span>Review and fix</span>" : "<span>Review only</span>"}</div>` : ""}
+      <p class="t2">${esc(S.overview || "The written summary appears here after the last phase.")}</p>
+      <div class="counts"><span class="count c"><b>${C}</b>critical</span><span class="count m"><b>${M}</b>major</span><span class="count"><b>${m}</b>minor</span>
+        <span class="count"><b>${phases.filter(p => p.status === "complete").length}/${phases.filter(p => p.status !== "skipped").length}</b>phases done</span></div>
+      ${(S.short_version || []).length ? more("Read the short version", `<ul style="margin:0;padding-left:18px;display:grid;gap:4px">${S.short_version.map(x => `<li>${esc(x)}</li>`).join("")}</ul>`) : ""}</section>
+    <section class="panel pad"><h3>Fix these first</h3>${top.length ? `<ol class="fixlist">${top.slice(0, 3).map(li).join("")}</ol>${top.length > 3 ? more(`${top.length - 3} more`, `<ol class="fixlist" start="4">${top.slice(3).map(li).join("")}</ol>`) : ""}`
+      : `<div class="empty" style="padding:24px 8px"><i class="ph ph-check-circle"></i><span>No critical problems recorded.</span></div>`}</section></div>`;
+  h += `<h2>Phases</h2><div class="panel" style="padding:4px 14px"><div class="checklist">${phases.map(p => {
+      const fs = p.findings || [], c = nSev(fs, "critical"), mj = nSev(fs, "major");
+      const res = p.status === "not_run" ? "Not run" : p.status === "incomplete" ? "Not finished" : (c || mj) ? [c ? `<b>${c} critical</b>` : "", mj ? `<em>${mj} major</em>` : ""].filter(Boolean).join(", ") : "No major issues";
+      return `<a class="crow" href="#/phase/${p.phase}"><span class="sdot s-${esc(p.status)}"></span><span class="nm">${esc(SHORT[p.phase] || p.title)}</span><span class="rs">${res}</span></a>`; }).join("")}</div></div>`;
+  const ranked = ISSUES.filter(f => f.severity === "critical" || f.severity === "major");
+  const issueRow = i => `<div class="item bar-${esc(i.severity)}" tabindex="0" data-href="#/finding/${esc(i.findings[0].phase)}/${esc(i.findings[0].id)}">
+    <div><div class="tt">${esc(i.title)}</div><div class="sub">${sevPill(i.severity)}${i.phases.length > 1 ? `<span>found by ${i.phases.length} phases</span>` : `<span>${esc(SHORT[i.phases[0]] || i.phases[0])}</span>`}${where(i.location) ? `<span class="mono">${esc(where(i.location))}</span>` : ""}</div></div>
+    <div class="side"><i class="ph ph-caret-right"></i></div></div>`;
+  const gaps = ((D.meta || {}).missing || []).concat(S.could_not_check || []);
+  const dl = D.to_download || [];
+  const cov = `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Phase</th><th>Status</th><th class="hide-md">Checked</th><th class="hide-md" style="width:22%"></th></tr></thead><tbody>${phases.map(p => {
+      const c = p.coverage || {}, pct = c.total ? Math.round(100 * c.checked / c.total) : (p.status === "complete" ? 100 : 0);
+      return `<tr class="go" data-href="#/phase/${p.phase}"><td>${esc(p.title)}</td><td>${pPill(p.status)}</td><td class="mono hide-md">${c.total != null ? `${c.checked}/${c.total} ${esc(c.unit || "")}` : ""}</td>
+        <td class="hide-md"><div class="meter${pct < 100 ? " part" : ""}"><i style="width:${pct}%"></i></div></td></tr>`; }).join("")}</tbody></table></div>`;
+  h += `<div style="margin-top:20px;display:flex;flex-direction:column;align-items:flex-start">
+    ${more(`All ${ranked.length} critical and major issues`, ranked.length ? capped(ranked.map(issueRow), 10) : '<div class="list"><div class="empty">None.</div></div>')}
+    ${gaps.length ? more(`What could not be checked (${gaps.length})`, `<div class="panel pad"><ul style="margin:0;padding-left:18px;display:grid;gap:6px">${gaps.map(g => `<li>${esc(g)}</li>`).join("")}</ul></div>`) : ""}
+    ${dl.length ? more(`Papers to download yourself (${dl.length})`, dlList(dl)) : ""}
+    ${more("Exact coverage counts", cov)}</div>`;
+  view.innerHTML = h;
+}
+
+function dlList(dl){
+  return `<div class="list">${dl.map(x => `<div class="item bar-unk"><div><div class="tt">${esc(x.title || x.key)}</div>
+    <div class="sub"><span class="mono">${esc(x.key)}</span><span>${x.have === "abstract" ? "only the abstract was available" : "no text available"}</span><span>${x.claims.length} claim${x.claims.length === 1 ? "" : "s"} depend on it</span>
+    ${x.link ? `<a href="${esc(x.link)}" target="_blank" rel="noopener">${esc(x.link)}</a>` : ""}</div></div></div>`).join("")}</div>
+    <p class="t3" style="margin-top:8px;font-size:12.5px">Put the PDFs in one folder and rerun fetch_sources.py with --local-pdfs; these claims are then checked against the full text.</p>`;
+}
+function itemsTab(p){
+  const items = p.items || [];
+  if (!items.length) return `<div class="panel"><div class="empty"><i class="ph ph-list-checks"></i><b>No item list recorded for this phase.</b></div></div>`;
+  const pick = (o, ks) => { for (const k of ks) if (o[k] != null && o[k] !== "") return o[k]; return ""; };
+  const label = i => pick(i, ["claim", "item", "what", "acronym", "label", "title", "comment", "text", "latex", "key", "sentence"]);
+  const verdict = i => String(pick(i, ["verdict", "status", "match"]));
+  // classify free-text verdicts by what they say is wrong, not by a fixed list of good words
+  const BAD = /need|issue|missing|absent|mismatch|^no\b|not[ _]|overstat|contradict|unsupported|fail|should[ _]cite|wrong|incorrect|copied|paraphrase|needs_work|undefined|error/i;
+  const MID = /partial|minor|could[ _]cite|warn|close|variant|caveat|but |false precision|info/i;
+  const tone = v => !v || v === "None" ? "mid" : BAD.test(v) ? "bad" : MID.test(v) ? "mid" : "ok";
+  const okv = v => tone(v) === "ok";
+  const loc = i => [i.file, i.line].filter(Boolean).join(":") || pick(i, ["location", "evidence_pointer"]);
+  const row = i => { const v = verdict(i), t = tone(v); return `<tr><td>${v && v !== "None" ? pill(t === "ok" ? "v-supported" : t === "mid" ? "v-partial" : "v-needs_fix", v.replace(/_/g, " ").slice(0, 60)) : ""}</td>
+    <td>${esc(typeof label(i) === "object" ? JSON.stringify(label(i)) : label(i)).slice(0, 400)}${i.note || i.reason ? `<div class="t3" style="font-size:12.5px;margin-top:2px">${esc(i.note || i.reason)}</div>` : ""}${i.command ? `<div class="mono t3" style="font-size:11.5px;margin-top:2px">${esc(i.command).slice(0, 200)}</div>` : ""}</td>
+    <td class="mono t3 hide-md">${esc(typeof loc(i) === "object" ? where(loc(i)) : loc(i))}</td></tr>`; };
+  const tbl = rows => `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Result</th><th>Checked</th><th class="hide-md">Where</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  const bad = items.filter(i => !okv(verdict(i))), good = items.filter(i => okv(verdict(i)));
+  return `<p class="t2" style="margin-bottom:12px">Every unit this phase checked, so nothing is hidden. ${bad.length} need attention, ${good.length} are fine.</p>`
+    + (bad.length ? capped(bad.map(row), 12, tbl) : "") + (good.length ? more(`${good.length} fine`, tbl(good.map(row).join("")), !bad.length) : "");
+}
+function findingRow(f, showPhase){
+  return `<div class="item bar-${esc(f.severity)}" tabindex="0" data-href="#/finding/${esc(f._p)}/${esc(f.id)}">
+    <div><div class="tt">${esc(f.title)}</div><div class="sub">${sevPill(f.severity)}${showPhase ? `<span>${esc((byId[f._p] || {}).title || "")}</span>` : ""}${where(f.location) ? `<span class="mono">${esc(where(f.location))}</span>` : ""}</div></div>
+    <div class="side"><i class="ph ph-caret-right"></i></div></div>`;
+}
+function findingList(list, showPhase, n){
+  if (!list.length) return `<div class="list"><div class="empty"><i class="ph ph-check-circle"></i><span>Nothing here.</span></div></div>`;
+  return capped(list.map(f => findingRow(f, showPhase)), n || 8);
+}
+
+/* ---------- phase page ---------- */
+let tabMem = store.get("tabs", {});
+function phaseView(pid){
+  const p = byId[pid]; if (!p) return notFound();
+  const fsN = (p.findings || []).length;
+  const tabs = [["findings", "Findings", fsN]];
+  if (pid === "01-references") tabs.unshift(["refs", "References", (p.items || []).length]);
+  if (pid === "02-factcheck") tabs.unshift(["claims", "Claims and evidence", (p.items || []).length]);
+  if (pid === "09-peer-review" && (p.reviewers || []).length) tabs.unshift(["reviewers", "Reviewer reports", p.reviewers.length]);
+  if (pid === "06-figures-tables" && (D.figures || []).length) tabs.push(["gallery", "Figure gallery", D.figures.length]);
+  if (!["01-references", "02-factcheck"].includes(pid) && (p.items || []).length) tabs.push(["items", "Everything checked", p.items.length]);
+  const tab = tabs.some(t => t[0] === tabMem[pid]) ? tabMem[pid] : tabs[0][0];
+  const c = p.coverage || {}, pct = c.total ? Math.round(100 * c.checked / c.total) : 0;
+  let h = `<div class="crumbs"><a href="#/overview">Overview</a><i class="ph ph-caret-right"></i><span>${esc(p.title)}</span></div>
+    <div class="phead"><div class="grow"><h1>${esc(p.title)}</h1><p class="about">${esc(ABOUT[pid] || "")}</p></div>
+    <div class="covbox"><div style="display:flex;gap:8px;align-items:center">${pPill(p.status)}${c.total != null ? `<span class="mono">${c.checked}/${c.total} ${esc(c.unit || "")}</span>` : ""}</div>
+      ${c.total ? `<div class="meter${pct < 100 ? " part" : ""}"><i style="width:${pct}%"></i></div>` : ""}</div></div>`;
+  if (p.status === "skipped") {
+    view.innerHTML = h + `<div class="panel"><div class="empty"><i class="ph ph-skip-forward"></i><b>Skipped: ${esc(p.status_reason || "not applicable")}.</b><span class="t3">${esc(p.summary || "")}</span></div></div>`;
+    return;
+  }
+  if (p.status === "not_run") {
+    view.innerHTML = h + `<div class="panel"><div class="empty"><i class="ph ph-hourglass"></i><b>This phase has not run yet.</b><span class="t3">Nothing has been checked here, so no result is shown. Run the phase and rebuild the dashboard.</span></div></div>`;
+    return;
+  }
+  if (p.status === "incomplete") { const r = (p.status_reason || "This phase did not produce complete results.").split("; ");
+    h += `<div class="callout warn"><i class="ph ph-warning-circle"></i><div><b>Not finished.</b> ${esc(r[0])}.${r.length > 1 ? more("Details", r.slice(1).map(x => `<div>${esc(x)}</div>`).join(""), false, "inline") : ""}${p.status_claimed ? `<div class="t2" style="margin-top:4px">An agent marked this phase complete, but the files do not prove it.</div>` : ""}</div></div>`; }
+  if (p.summary) { // two sentences up front, the rest one click away
+    const parts = p.summary.match(/[^.!?]+[.!?]+(\s|$)|[^.!?]+$/g) || [p.summary];
+    const head = parts.slice(0, 2).join(""), tail = parts.slice(2).join("");
+    h += `<p class="lead">${esc(head)}</p>${tail.trim() ? more("Read the full summary", `<p class="lead" style="margin:0">${esc(tail)}</p>`, false, "inline") : ""}`; }
+  h += `<div class="tabs" role="tablist">${tabs.map(([k, l, n]) => `<button class="tab" role="tab" data-tab="${k}" aria-selected="${k === tab}">${esc(l)}<span class="mono">${n}</span></button>`).join("")}</div><div id="tabBody" class="in"></div>`;
+  view.innerHTML = h;
+  view.querySelectorAll("[data-tab]").forEach(b => b.onclick = () => { tabMem[pid] = b.dataset.tab; store.set("tabs", tabMem); phaseView(pid); markSel(); });
+  $("#tabBody").innerHTML = ({findings: findingsTab, refs: refsTab, claims: claimsTab, reviewers: reviewersTab, gallery: galleryTab, items: itemsTab})[tab](p);
+}
+function findingsTab(p){
+  const f = (p.findings || []).map(x => ({...x, _p: p.phase}));
+  if (!f.length) return `<div class="panel"><div class="empty"><i class="ph ph-check-circle"></i><b>${p.status === "complete" ? "No problems found in this phase." : "No findings yet."}</b></div></div>`;
+  let h = "";
+  ["critical", "major"].forEach(s => { const L = f.filter(x => x.severity === s); if (L.length) h += `<div class="ghead">${sevPill(s)}<span>${L.length}</span></div>` + findingList(L, false, 6); });
+  const rest = f.filter(x => x.severity === "minor" || x.severity === "info");
+  if (rest.length) h += more(`${nSev(rest, "minor")} minor and ${nSev(rest, "info")} info`, findingList(rest, false, 25));
+  return h;
+}
+function srcPill(kind){ return kind ? pill(kind === "none" ? "v-cannot_verify" : kind === "abstract" ? "v-partial" : "v-supported", kind === "none" ? "nothing found" : kind === "fulltext" ? "full text" : kind) : ""; }
+function refsTab(p){
+  const items = p.items || [];
+  if (!items.length) return `<div class="panel"><div class="empty"><i class="ph ph-books"></i><b>No reference verdicts yet.</b></div></div>`;
+  const row = r => { const s = (D.sources || {})[r.key] || {};
+    return `<tr class="go" tabindex="0" data-href="#/ref/${esc(r.key)}"><td class="mono t3 hide-md">${esc(r.number || "")}</td>
+      <td><div style="font-weight:550">${esc(r.title || r.key)}</div><div class="mono t3">${esc(r.key)}</div></td><td>${vPill(r.verdict)}</td>
+      <td class="hide-md">${(r.problems || []).length ? esc(r.problems.map(x => x.field || x).join(", ")) : '<span class="t3">none</span>'}</td><td class="hide-md">${srcPill(s.kind)}</td></tr>`; };
+  const tbl = rows => `<div class="tbl-wrap"><table class="tbl"><thead><tr><th class="hide-md">#</th><th>Reference</th><th>Verdict</th><th class="hide-md">Problems</th><th class="hide-md">Source text</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  const bad = items.filter(i => i.verdict !== "verified"), good = items.filter(i => i.verdict === "verified");
+  let h = `<p class="t2" style="margin-bottom:12px">${bad.length ? `<b style="color:var(--text)">${bad.length} of ${items.length}</b> references need attention.` : `All ${items.length} references match their records.`} Open a row to see each field next to the registry record.</p>`;
+  if (bad.length) h += capped(bad.map(row), 10, tbl);
+  if (good.length) h += more(`${good.length} verified`, tbl(good.map(row).join("")), !bad.length);
+  return h;
+}
+function bestEv(it){ const ev = it.evidence || []; return ev.find(e => e.match === "exact") || ev.find(e => e.match === "close") || ev[0]; }
+function claimRow(it){ const b = bestEv(it);
+  return `<div class="item ${vBar(it.verdict)}" tabindex="0" data-href="#/claim/${esc(it.id)}">
+    <div><div class="tt">${esc(it.claim || it.sentence)}</div><div class="sub">${vPill(it.verdict)}<span class="mono">${esc(it.cite)}</span>
+      ${b ? `<span>${esc(ML[b.match] || "")}${b.page ? `, p. ${b.page}` : ""}</span>` : "<span>no quote</span>"}${it.quote_check_failed ? `<span style="color:var(--crit);font-weight:550">agent quote not in source</span>` : ""}
+      <span class="mono">${esc((it.file || "") + ":" + (it.line || ""))}</span></div></div><div class="side"><i class="ph ph-caret-right"></i></div></div>`; }
+function claimsTab(p){
+  const items = p.items || [];
+  if (!items.length) return `<div class="panel"><div class="empty"><i class="ph ph-quotes"></i><b>No claims checked yet.</b></div></div>`;
+  const n = v => items.filter(i => i.verdict === v).length;
+  let h = "";
+  if ((p.missing || []).length) h += `<div class="callout bad"><i class="ph ph-x-circle"></i><div><b>${p.missing.length} citations have no verdict yet.</b> They were never checked.${more("Show them", p.missing.map(m => `<div class="mono">${esc(m.file + ":" + m.line)} [${esc(m.cite)}]</div>`).join(""), false, "inline")}</div></div>`;
+  h += `<div class="counts" style="margin:0 0 18px"><span class="count c"><b>${n("not_supported") + n("contradicted")}</b>not supported</span><span class="count m"><b>${n("partial")}</b>partly supported</span>
+    <span class="count"><b>${n("cannot_verify")}</b>cannot verify</span><span class="count"><b>${n("supported")}</b>supported</span></div>`;
+  [[["contradicted", "not_supported"], "Not supported"], [["partial"], "Partly supported"], [["cannot_verify"], "Cannot verify"]].forEach(([vs, label]) => {
+    const L = items.filter(i => vs.includes(i.verdict)); if (L.length) h += `<div class="ghead">${esc(label)}<span class="t3">${L.length}</span></div>` + capped(L.map(claimRow), 6); });
+  const ok = items.filter(i => i.verdict === "supported");
+  if (ok.length) h += more(`${ok.length} supported`, capped(ok.map(claimRow), 25), ok.length === items.length);
+  return h;
+}
+function reviewersTab(p){
+  return (p.synthesis ? `<section class="panel pad" style="margin-bottom:16px"><h3>Where the reviewers agree</h3><p style="margin:0">${esc(p.synthesis)}</p></section>` : "")
+    + (p.reviewers || []).map((r, ri) => { const cs = r.concerns || [], maj = cs.filter(c => c.severity !== "minor"), min = cs.filter(c => c.severity === "minor");
+      const one = c => `<div class="concern"><div class="meta">${sevPill(c.severity || "major")}${c.blocking ? pill("sev-critical", "Blocking") : ""}<span class="mono">${esc(c.id || "")}</span>${c.evidence_pointer ? `<span class="mono">${esc(c.evidence_pointer)}</span>` : ""}</div>
+        <div style="font-weight:550;margin:8px 0 4px">${esc(c.title || "")}</div><div class="t2">${esc(c.detail || "")}</div>${c.resolution ? `<div class="fix" style="margin-top:10px"><h4 style="margin:0 0 4px;font-size:12px;color:var(--text-3)">What would resolve it</h4>${esc(c.resolution)}</div>` : ""}</div>`;
+      return `<section class="panel pad reviewer" style="margin-bottom:14px"><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><h2 style="margin:0">${esc(r.name || "Reviewer " + (ri + 1))}</h2>${r.recommendation ? pill(/reject/i.test(r.recommendation) ? "sev-critical" : /major/i.test(r.recommendation) ? "sev-major" : "v-supported", "Recommends " + r.recommendation) : ""}</div>
+        <p class="t3" style="margin:4px 0 12px">${esc(r.lens || "")}</p>${r.summary ? `<p>${esc(r.summary)}</p>` : ""}
+        ${maj.map(one).join("")}${min.length ? more(`${min.length} minor comments`, min.map(one).join("")) : ""}</section>`; }).join("");
+}
+function galleryTab(p){
+  return `<div class="gallery">${D.figures.map(f => { const fs = (p.findings || []).filter(x => (x.location || {}).label === f.label);
+    return `<figure class="panel"><a href="${esc(f.src)}" target="_blank" rel="noopener"><img src="${esc(f.src)}" alt="${esc(f.label)}" loading="lazy"></a>
+      <figcaption class="pad" style="padding:12px 14px"><div class="mono t2">${esc(f.label)}</div>${fs.length ? fs.map(x => `<div style="margin-top:6px">${sevPill(x.severity)} <a href="#/finding/${p.phase}/${esc(x.id)}">${esc(x.title)}</a></div>`).join("") : '<div class="t3" style="margin-top:4px">No findings.</div>'}</figcaption></figure>`; }).join("")}</div>`;
+}
+
+/* ---------- claim evidence viewer ---------- */
+function claimView(id){
+  const items = ((byId["02-factcheck"] || {}).items) || [];
+  const i = items.findIndex(x => x.id === id); if (i < 0) return notFound();
+  const it = items[i], prev = items[i - 1], next = items[i + 1], sc = it.second_check || {}, src = (D.sources || {})[it.cite] || {};
+  let h = `<div class="crumbs"><a href="#/phase/02-factcheck">Fact check</a><i class="ph ph-caret-right"></i><span class="mono">${esc(it.id)}</span>
+    <span class="pager">${prev ? `<a class="btn" href="#/claim/${esc(prev.id)}" data-pager="prev"><i class="ph ph-arrow-left"></i>Previous</a>` : ""}${next ? `<a class="btn" href="#/claim/${esc(next.id)}" data-pager="next">Next<i class="ph ph-arrow-right"></i></a>` : ""}</span></div>
+    <div class="claim"><section class="panel pad">
+      <div class="verdict-line">${vPill(it.verdict)}<span class="mono t2">cites ${esc(it.cite)}</span>${srcPill(src.kind)}<span class="grow" style="flex:1"></span><span class="mono t3">${esc(it.file)}:${esc(it.line)}</span><span class="t3 hide-md">${esc(it.section || "")}</span></div>
+      <div class="ms"><mark>${esc(it.sentence || "")}</mark></div>
+      ${(it.context_prev || it.context_next) ? more("Surrounding text", `<div class="ms">${it.context_prev ? `<span class="ctx">${esc(it.context_prev)} </span>` : ""}<mark>${esc(it.sentence || "")}</mark>${it.context_next ? `<span class="ctx"> ${esc(it.context_next)}</span>` : ""}</div>`, false, "inline") : ""}
+      <div class="claim-top" style="margin-top:16px;padding-top:16px;border-top:1px solid var(--line)">
+        <div class="sect" style="margin:0"><h4>Claim checked</h4><div>${esc(it.claim || "")}</div></div>
+        <div class="sect" style="margin:0"><h4>Why this verdict</h4><div class="t2">${esc(it.reasoning || "No reasoning recorded.")}</div></div></div>
+      ${it.quote_check_failed ? `<div class="callout bad" style="margin:14px 0 0"><i class="ph ph-shield-warning"></i><div><b>Downgraded automatically.</b> The agent said "${esc(VL[it.verdict_before_quote_check] || "")}", but its quote is not in the saved source. Treat this claim as unchecked.</div></div>` : ""}
+      ${sc.verdict ? (sc.agrees === false ? `<div class="callout ${sc.adjudication ? "info" : "warn"}" style="margin:14px 0 0"><i class="ph ph-users"></i><div><b>Second checker disagreed:</b> ${esc(VL[sc.verdict] || sc.verdict)}.${sc.adjudication ? `<div style="margin-top:6px"><b>Decision:</b> ${esc(sc.adjudication)}</div>` : `<div style="margin-top:6px;color:var(--major)"><b>No decision recorded yet.</b></div>`}${more("Second checker's reasoning and quote", `<div class="t2">${esc(sc.note || "")}</div>`, false, "inline")}</div></div>`
+          : more(`Second check agrees (${esc(VL[sc.verdict] || sc.verdict)})`, `<div class="t2">${esc(sc.note || "")}</div>`, false, "inline"))
+        : (it.verdict !== "supported" ? `<div class="callout warn" style="margin:14px 0 0"><i class="ph ph-users"></i><div><b>Second check missing.</b> This flag has not been double-checked yet.</div></div>` : "")}
+      ${it.suggested_fix ? `<div class="fix" style="margin-top:14px"><h4 style="margin:0 0 4px;font-size:12px;color:var(--text-3)">Suggested fix</h4>${esc(it.suggested_fix)}</div>` : ""}</section>`;
+  const evs = it.evidence || [];
+  const card = ev => { const s2 = (D.sources || {})[ev.source_key] || {}; let c = `<section class="panel src"><div class="src-h">${pill("m-" + ev.match, (ML[ev.match] || ev.match) + (ev.match === "close" ? ` ${Math.round(100 * (ev.score || 0))}%` : ""))}
+      <span class="mono">${esc(ev.source_key)}</span><span class="t3">${esc(ev.found_in || s2.kind || "")}${ev.page ? `, page ${esc(ev.page)}` : ""}</span><span class="grow"></span>${ev.supports === false ? pill("v-contradicted", "Evidence against") : ""}</div>`;
+    if (ev.page_image && ev.highlight) { const W = ev.highlight.page_w, H = ev.highlight.page_h;
+      c += `<div class="crop" data-crop title="Click to see the whole page"><div class="pg"><img src="${esc(ev.page_image)}" alt="Page ${esc(ev.page)} of ${esc(ev.source_key)}">
+        ${ev.highlight.boxes.map(b => `<span class="box" style="left:${100 * b[0] / W}%;top:${100 * b[1] / H}%;width:${100 * (b[2] - b[0]) / W}%;height:${100 * (b[3] - b[1]) / H}%"></span>`).join("")}</div>
+        <span class="hint"><i class="ph ph-arrows-out-simple"></i><span data-hint>Whole page</span></span></div>`; }
+    c += ev.match === "not_found"
+      ? `<div class="quote"><b style="color:var(--crit)">This quote is not in the saved source.</b> <span class="t2">${esc(ev.match_note || "")}</span><div class="t3" style="margin-top:8px">The agent quoted: "${esc(ev.quote)}"</div></div>`
+      : `<div class="quote"><span class="ctx">... ${esc(ev.context_before || "")}</span><mark>${esc(ev.context_match || ev.quote)}</mark><span class="ctx">${esc(ev.context_after || "")} ...</span></div>`;
+    c += `<div class="src-f">${ev.pdf_link ? `<a class="btn primary" href="${esc(ev.pdf_link)}" target="_blank" rel="noopener"><i class="ph ph-file-pdf"></i>Open PDF${ev.page ? ` at page ${esc(ev.page)}` : ""}</a>` : ""}
+      ${s2.abstract ? `<a class="btn" href="${esc(s2.abstract)}" target="_blank" rel="noopener"><i class="ph ph-article"></i>Abstract</a>` : ""}${s2.doi ? `<a class="btn" href="https://doi.org/${esc(s2.doi)}" target="_blank" rel="noopener"><i class="ph ph-link"></i>DOI</a>` : ""}</div></section>`;
+    return c; };
+  h += `<div><h2 style="margin:4px 0 10px">In the source</h2>${evs.length ? card(evs[0]) + (evs.length > 1 ? more(`${evs.length - 1} more passage${evs.length > 2 ? "s" : ""}`, evs.slice(1).map(card).join("<div style='height:12px'></div>")) : "")
+      : `<div class="panel"><div class="empty"><i class="ph ph-file-dashed"></i><b>No passage was recorded for this claim.</b><span class="t3">${src.kind === "none" ? "No text of this source could be found legally online." : "The checker did not quote the source."}</span></div></div>`}</div></div>`;
+  view.innerHTML = h;
+  view.querySelectorAll("[data-crop]").forEach(cr => {
+    const img = cr.querySelector("img"), box = cr.querySelector(".box"), hint = cr.querySelector("[data-hint]");
+    const center = () => { if (!cr.classList.contains("full") && box) cr.scrollTop = Math.max(0, box.offsetTop - cr.clientHeight / 2 + box.offsetHeight); };
+    img.complete ? center() : img.addEventListener("load", center, {once: true});
+    cr.onclick = () => { cr.classList.toggle("full"); hint.textContent = cr.classList.contains("full") ? "Zoom to passage" : "Whole page"; if (!cr.classList.contains("full")) center(); };
+  });
+}
+
+/* ---------- drawers ---------- */
+let dList = [], dIdx = -1;
+function openDrawer(title, html){ $("#dTitle").textContent = title; $("#dBody").innerHTML = html; $("#dBody").scrollTop = 0;
+  $("#drawer").classList.add("on"); $("#scrim").classList.add("on"); $("#drawer").setAttribute("aria-hidden", "false"); }
+function closeDrawer(){ $("#drawer").classList.remove("on"); $("#scrim").classList.remove("on"); $("#drawer").setAttribute("aria-hidden", "true"); }
+const evMini = list => (list || []).map(e => `<div class="ev-mini"><div class="k">${esc(e.kind || "evidence")}${e.source_key ? ` | <span class="mono">${esc(e.source_key)}</span>` : ""}${e.page ? `, p. ${esc(e.page)}` : ""}</div>
+  <div style="white-space:pre-wrap">${esc(e.text || e.quote || "")}</div>${e.url ? `<div style="margin-top:6px;word-break:break-all"><a href="${esc(e.url)}" target="_blank" rel="noopener">${esc(e.url)}</a></div>` : ""}</div>`).join("");
+function findingDrawer(pid, id){
+  const p = byId[pid]; const f = p && (p.findings || []).find(x => x.id === id); if (!f) return;
+  const h = `<div class="meta">${sevPill(f.severity)}<span class="mono">${esc(f.id)}</span><span>${esc(p.title)}</span></div>
+    <h2>${esc(f.title)}</h2>
+    ${where(f.location) || (f.location || {}).label ? `<div class="sect"><h4>Where</h4><div class="mono">${esc(where(f.location))}${(f.location || {}).label ? ` [${esc(f.location.label)}]` : ""}</div></div>` : ""}
+    <div class="sect"><h4>What is wrong</h4><div class="body">${esc(f.what || f.detail || "")}</div></div>
+    ${(() => { const iss = issueOf(pid, id); const others = iss ? iss.findings.filter(m => !(m.phase === pid && m.id === id)) : [];
+      return others.length ? `<div class="sect"><h4>Also found by</h4>${others.map(m => `<a class="mono" href="#/finding/${esc(m.phase)}/${esc(m.id)}" style="margin-right:10px">${esc(SHORT[m.phase] || m.phase)} ${esc(m.id)}</a>`).join("")}</div>` : ""; })()}
+    ${f.fix ? `<div class="sect fix"><h4>How to fix</h4><div class="body">${esc(f.fix)}</div></div>` : ""}
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin:4px 0 6px">${f.claim_ref ? `<a class="btn primary" href="#/claim/${esc(f.claim_ref)}"><i class="ph ph-magnifying-glass"></i>See the source passage</a>` : ""}${f.ref_key ? `<a class="btn" href="#/ref/${esc(f.ref_key)}"><i class="ph ph-book-open"></i>Open the reference</a>` : ""}</div>
+    ${f.why ? more("Why it matters", `<div class="body">${esc(f.why)}</div>`) : ""}
+    ${f.quote ? more("Manuscript text", `<div class="body">${esc(f.quote)}</div>`) : ""}
+    ${(f.evidence || []).length ? more(`Evidence (${f.evidence.length})`, evMini(f.evidence)) : ""}
+    ${f.confidence || f.verified_by ? `<p class="t3" style="margin-top:16px;font-size:12.5px">${f.confidence ? `Confidence: ${esc(f.confidence)}. ` : ""}${f.verified_by ? `Checked by: ${esc(f.verified_by)}` : ""}</p>` : ""}`;
+  dList = (p.findings || []).map(x => "#/finding/" + pid + "/" + x.id); dIdx = dList.indexOf("#/finding/" + pid + "/" + id);
+  openDrawer("Finding " + (dIdx + 1) + " of " + dList.length, h);
+}
+function refDrawer(key){
+  const p = byId["01-references"]; const r = ((p && p.items) || []).find(x => x.key === key) || {key};
+  const a = (D.auto_refs || {})[key] || {}, s = (D.sources || {})[key] || {}, cited = a.cited || {}, rec = (a.records || [])[0] || {};
+  const names = x => (x || []).map(y => (y.family || "") + (y.given ? ", " + y.given : "")).join("; ");
+  const rows = [["Title", cited.title, rec.title], ["Authors", names(cited.authors), names(rec.authors)], ["Year", cited.year, rec.year], ["Venue", cited.journal, rec.journal],
+    ["Volume", cited.volume, rec.volume], ["Issue", cited.issue, rec.issue], ["Pages", cited.pages, rec.pages], ["DOI", cited.doi, rec.doi]];
+  const bad = new Set((r.problems || []).map(x => (x.field || "").toLowerCase()));
+  const probs = r.problems || [];
+  const h = `<div class="meta">${vPill(r.verdict || "check")}<span class="mono">${esc(key)}</span>${srcPill(s.kind)}</div>
+    <h2>${esc(r.title || cited.title || key)}</h2>
+    ${r.reason ? `<div class="sect"><h4>Result</h4><div class="body">${esc(r.reason)}</div></div>` : ""}
+    ${probs.length ? `<div class="sect"><h4>Problems</h4>${probs.map(x => `<div style="display:flex;gap:8px;align-items:baseline;margin:6px 0">${sevPill(x.severity || "major")}<div><b>${esc(x.field || "")}</b> ${esc(x.note || x)}</div></div>`).join("")}</div>` : ""}
+    ${r.corrected_entry ? `<div class="sect fix"><h4>Corrected entry</h4><pre class="mono" style="white-space:pre-wrap;margin:0">${esc(r.corrected_entry)}</pre></div>` : ""}
+    ${more("Field by field, paper vs registry", `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Field</th><th>In the paper</th><th>Record (${esc(rec.source || "none")})</th></tr></thead><tbody>${rows.map(([f, c, v]) =>
+      `<tr><td class="t3">${f}</td><td class="${bad.has(f.toLowerCase()) ? "bad" : ""}">${esc(c || "")}</td><td>${esc(v || "")}</td></tr>`).join("")}</tbody></table></div>`, probs.length > 0)}
+    ${(r.evidence || []).length ? more(`Evidence (${r.evidence.length})`, evMini(r.evidence)) : ""}
+    ${more("Source text and lookup log", `<p class="t2">${esc(s.kind ? (s.kind === "none" ? "No full text or abstract could be found legally online." : (s.kind === "fulltext" ? "Full text" : s.kind) + " from " + (s.origin || "")) : "Not fetched.")}</p>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px">${s.pdf ? `<a class="btn primary" href="${esc(s.pdf)}" target="_blank" rel="noopener"><i class="ph ph-file-pdf"></i>Open PDF</a>` : ""}${s.abstract ? `<a class="btn" href="${esc(s.abstract)}" target="_blank" rel="noopener"><i class="ph ph-article"></i>Abstract</a>` : ""}${(s.doi || rec.doi) ? `<a class="btn" href="https://doi.org/${esc(s.doi || rec.doi)}" target="_blank" rel="noopener"><i class="ph ph-link"></i>DOI</a>` : ""}</div>
+      <pre class="mono ev-mini" style="white-space:pre-wrap;margin:0">${esc((a.lookup_log || []).concat(s.log || []).join("\n") || "No log.")}</pre>`)}`;
+  const items = (p && p.items) || []; dList = items.map(x => "#/ref/" + x.key); dIdx = dList.indexOf("#/ref/" + key);
+  openDrawer(dIdx >= 0 ? `Reference ${dIdx + 1} of ${dList.length}` : "Reference", h);
+}
+
+/* ---------- other pages ---------- */
+function sourcesView(){
+  const S = D.sources || {}, keys = Object.keys(S), n = k => keys.filter(x => S[x].kind === k).length;
+  view.innerHTML = `<div class="crumbs"><a href="#/overview">Overview</a><i class="ph ph-caret-right"></i><span>Sources</span></div>
+    <h1>Sources</h1><p class="about">What the fact check could read. Full text came only from legal open-access copies or from files you supplied.</p>
+    ${(D.to_download || []).length ? `<div class="callout warn" style="margin-top:16px"><i class="ph ph-download-simple"></i><div><b>${D.to_download.length} papers could not be downloaded legally.</b> Claims citing them were checked against an abstract or not at all.${more("Show the list", dlList(D.to_download), false, "inline")}</div></div>` : ""}
+    <div class="stats">${[["fulltext", "Full text"], ["webpage", "Web page"], ["abstract", "Abstract only"], ["none", "Nothing found"]].map(([k, l]) => `<div class="panel stat"><b>${n(k)}</b><span>${l}</span></div>`).join("")}</div>
+    ${keys.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Reference</th><th>What we have</th><th class="hide-md">From</th></tr></thead><tbody>${keys.map(k =>
+      `<tr class="go" tabindex="0" data-href="#/ref/${esc(k)}"><td class="mono">${esc(k)}</td><td>${srcPill(S[k].kind)}</td><td class="t3 hide-md" style="word-break:break-all">${esc(S[k].origin || "")}</td></tr>`).join("")}</tbody></table></div>`
+      : `<div class="panel"><div class="empty"><i class="ph ph-books"></i><b>No sources fetched yet.</b></div></div>`}`;
+}
+function changesView(){
+  const C = D.changes || [], V = D.verify || null, PF = (V && V.per_fix) || {};
+  const FL = {verified:"Verified", verified_mechanical:"Checks passed, agent check missing", needs_agent_check:"Waiting for agent check", failed:"Failed check", not_applied:"Not applied"};
+  const fcls = st => st === "verified" ? "v-supported" : st === "failed" || st === "not_applied" ? "v-needs_fix" : "v-partial";
+  const ok = C.filter(c => (PF[c.id] || {}).status === "verified").length;
+  let h = `<div class="crumbs"><a href="#/overview">Overview</a><i class="ph ph-caret-right"></i><span>Agent fixes</span></div>
+    <h1>Agent fixes</h1><p class="about">Edited copies are in <span class="mono">corrected-by-agent/</span>. <b>marked</b> shows each edit in blue (removed text in red); <b>clean</b> has the same edits without color. Your original files were not changed.</p>`;
+  if (!V) h += `<div class="callout warn" style="margin-top:16px"><i class="ph ph-warning-circle"></i><div><b>These fixes have not been verified.</b> Run verify_fixes.py before using the corrected files.</div></div>`;
+  else { const cls = V.overall === "pass" ? "good" : V.overall === "fail" ? "bad" : "warn";
+    const msg = V.overall === "pass" ? "Every fix was re-checked after editing and nothing new broke." : V.overall === "fail" ? "Verification failed. Do not use the corrected files until the failed checks are fixed." : "Verification is not finished.";
+    h += `<div class="callout ${cls}" style="margin-top:16px"><i class="ph ${V.overall === "pass" ? "ph-shield-check" : "ph-shield-warning"}"></i><div><b>${esc(msg)}</b>
+      ${more(`${(V.checks || []).length + 1} checks`, `<div class="tbl-wrap"><table class="tbl"><tbody>${(V.checks || []).concat([{name: "agent re-check of edited sentences", status: (V.agent_check || {}).status, detail: (V.agent_check || {}).detail}]).map(c =>
+        `<tr><td>${pill(c.status === "pass" ? "v-supported" : c.status === "fail" ? "v-needs_fix" : "v-partial", c.status)}</td><td style="font-weight:550">${esc(c.name)}</td><td class="t2">${esc(c.detail)}</td></tr>`).join("")}</tbody></table></div>`, false, "inline")}</div></div>`; }
+  const CP = D.comparison;
+  if (CP) { const row = r => { const x = r.after || r.before; return `<div class="item bar-${r.status === "new" ? "critical" : r.status === "resolved" ? "ok" : esc(x.severity)}"><div><div class="tt">${esc(x.title)}</div><div class="sub">${sevPill(x.severity)}${r.severity_change ? `<span>${esc(r.severity_change)}</span>` : ""}</div></div></div>`; };
+    h += `<h2>Before and after the fixes</h2><div class="counts" style="margin:0 0 12px"><span class="count"><b>${CP.counts.resolved}</b>resolved</span><span class="count m"><b>${CP.counts.still_open}</b>still open</span><span class="count c"><b>${CP.counts.new}</b>new</span></div>`
+      + (CP.counts.new ? `<div class="ghead">New after the changes</div>` + capped(CP.issues.filter(r => r.status === "new").map(row), 8) : "")
+      + more(`${CP.counts.still_open} still open`, capped(CP.issues.filter(r => r.status === "still_open").map(row), 20))
+      + more(`${CP.counts.resolved} resolved`, capped(CP.issues.filter(r => r.status === "resolved").map(row), 20)) + "<h2>Each fix</h2>"; }
+  h += `<div class="counts" style="margin:0 0 18px"><span class="count"><b>${ok}</b>verified</span><span class="count c"><b>${C.length - ok}</b>not verified</span></div>
+    <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Fix</th><th>Change</th><th class="hide-md">Why</th></tr></thead><tbody>${C.map(c => { const pf = PF[c.id] || {};
+      return `<tr><td><div class="mono">${esc(c.id || "")}</div><div class="mono t3">${esc(c.file)}</div>
+      <div style="margin-top:6px">${pill(fcls(pf.status || (c.status === "applied" ? "" : "not_applied")), FL[pf.status] || (c.status === "applied" ? "Not verified" : "Not applied"))}</div>
+      ${(pf.notes || []).length ? more("Checks", `<div class="t2" style="font-size:12.5px">${pf.notes.map(n => `<div>${esc(n)}</div>`).join("")}</div>`, false, "inline") : ""}
+      ${c.note ? `<div class="t3" style="margin-top:4px;font-size:12.5px">${esc(c.note)}</div>` : ""}</td>
+      <td><div style="color:var(--crit);text-decoration:line-through;text-decoration-thickness:1px;white-space:pre-wrap">${esc(c.find)}</div><div style="color:var(--accent);margin-top:4px;white-space:pre-wrap">${esc(c.replace)}</div></td><td class="hide-md t2">${esc(c.reason || "")}</td></tr>`; }).join("")}</tbody></table></div>`;
+  view.innerHTML = h;
+}
+function searchView(q){
+  const t = q.toLowerCase();
+  const fs = allF.filter(f => (f.title + " " + (f.what || "") + " " + where(f.location)).toLowerCase().includes(t));
+  const cl = ((byId["02-factcheck"] || {}).items || []).filter(i => ((i.sentence || "") + " " + (i.claim || "") + " " + i.cite).toLowerCase().includes(t));
+  const rf = ((byId["01-references"] || {}).items || []).filter(i => ((i.title || "") + " " + i.key).toLowerCase().includes(t));
+  const refRow = r => `<div class="item ${vBar(r.verdict)}" tabindex="0" data-href="#/ref/${esc(r.key)}"><div><div class="tt">${esc(r.title || r.key)}</div><div class="sub">${vPill(r.verdict)}<span class="mono">${esc(r.key)}</span></div></div><div class="side"><i class="ph ph-caret-right"></i></div></div>`;
+  const none = `<div class="list"><div class="empty"><span class="t3">No matches.</span></div></div>`;
+  view.innerHTML = `<h1>Results for "${esc(q)}"</h1><p class="about">${fs.length} findings, ${cl.length} claims, ${rf.length} references</p>
+    <h2>Findings</h2>${fs.length ? findingList(fs, true, 6) : none}<h2>Claims</h2>${cl.length ? capped(cl.map(claimRow), 6) : none}<h2>References</h2>${rf.length ? capped(rf.map(refRow), 6) : none}`;
+}
+function notFound(){ view.innerHTML = `<div class="panel"><div class="empty"><i class="ph ph-question"></i><b>Nothing at this address.</b><a href="#/overview">Back to the overview</a></div></div>`; }
+
+/* ---------- router ---------- */
+let base = null; const scrollMem = {};
+function route(){
+  let hash = location.hash.slice(1); if (!hash || hash === "/") hash = "/overview"; store.set("route", hash);
+  const parts = hash.split("/").filter(Boolean);
+  const isDrawer = parts[0] === "finding" || parts[0] === "ref";
+  // a drawer opens over the page you are on, unless that page is a different phase: then it opens over its own phase
+  const home = parts[0] === "finding" ? "/phase/" + parts[1] : "/phase/01-references";
+  const keep = base && !(base.startsWith("/phase/") && base !== home) && !(parts[0] === "ref" && base.startsWith("/claim/"));
+  const nb = isDrawer ? (keep ? base : home) : hash;
+  if (nb !== base) {
+    if (base) scrollMem[base] = main.scrollTop;
+    const b = nb.split("/").filter(Boolean), rest = decodeURIComponent(b.slice(1).join("/"));
+    ({overview, phase: () => phaseView(b[1]), claim: () => claimView(rest), sources: sourcesView, changes: changesView, search: () => searchView(rest)}[b[0]] || notFound)();
+    renderNav(b[0] === "claim" ? "/phase/02-factcheck" : nb);
+    main.scrollTop = scrollMem[nb] || 0; base = nb; nav.classList.remove("open");
+  }
+  if (parts[0] === "finding") findingDrawer(parts[1], decodeURIComponent(parts.slice(2).join("/")));
+  else if (parts[0] === "ref") refDrawer(decodeURIComponent(parts.slice(1).join("/")));
+  else closeDrawer();
+  markSel();
+}
+function markSel(){ view.querySelectorAll("[data-href]").forEach(r => r.classList.toggle("sel", r.dataset.href === location.hash)); }
+const back = () => { location.hash = base || "/overview"; };
+$("#scrim").onclick = back; $("#dClose").onclick = back;
+const step = d => { const n = dIdx + d; if (dIdx >= 0 && n >= 0 && n < dList.length) location.hash = dList[n]; };
+$("#dPrev").onclick = () => step(-1); $("#dNext").onclick = () => step(1);
+view.addEventListener("click", e => { const r = e.target.closest("[data-href]"); if (r && !e.target.closest("a,summary,button")) location.hash = r.dataset.href; });
+view.addEventListener("keydown", e => { if (e.key === "Enter") { const r = e.target.closest("[data-href]"); if (r) location.hash = r.dataset.href; } });
+const q = $("#q"); let qt;
+q.addEventListener("input", () => { clearTimeout(qt); qt = setTimeout(() => { const v = q.value.trim(); location.hash = v ? "/search/" + encodeURIComponent(v) : "/overview"; }, 180); });
+document.addEventListener("keydown", e => {
+  if (e.target.matches("input,textarea")) { if (e.key === "Escape") q.blur(); return; }
+  const drawerOn = $("#drawer").classList.contains("on");
+  if (e.key === "/") { e.preventDefault(); q.focus(); q.select(); }
+  else if (e.key === "Escape") { if (drawerOn) back(); else if (nav.classList.contains("open")) nav.classList.remove("open"); }
+  else if (e.key === "j" || e.key === "k") {
+    const d = e.key === "j" ? 1 : -1;
+    if (drawerOn) return step(d);
+    if (location.hash.startsWith("#/claim/")) { const a = view.querySelector(`[data-pager="${d > 0 ? "next" : "prev"}"]`); if (a) location.hash = a.getAttribute("href"); return; }
+    const rows = [...view.querySelectorAll("[data-href]")].filter(r => r.offsetParent); if (!rows.length) return;
+    const n = Math.max(0, Math.min(rows.length - 1, rows.indexOf(document.activeElement) + d)); rows[n].focus(); rows[n].scrollIntoView({block: "nearest"});
+  }
+});
+$("#paperTitle").textContent = (D.paper || {}).title || "Paper review";
+document.title = ((D.paper || {}).title || "Paper") + " | Review";
+const v = (D.summary || {}).verdict;
+if (v) $("#verdictChip").innerHTML = pill(v === "ready" ? "v-supported" : v === "almost" ? "v-partial" : "v-not_supported", {ready: "Ready", almost: "Almost ready", not_ready: "Not ready"}[v] || v);
+window.addEventListener("hashchange", route);
+if (!location.hash) { const r = store.get("route", null); if (r) history.replaceState(null, "", "#" + r); }
+route();
+})();
+</script>
+</body>
+</html>
