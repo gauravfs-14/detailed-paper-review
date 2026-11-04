@@ -13,6 +13,9 @@ FIELDS = {
     "report": ["title", "date", "institution", "reportNumber", "url", "pages", "place", "abstractNote", "citationKey", "DOI"],
     "journalArticle": ["title", "date", "publicationTitle", "volume", "issue", "pages", "DOI", "url", "ISSN",
                        "journalAbbreviation", "language", "abstractNote", "citationKey", "extra"],
+    "conferencePaper": ["title", "date", "proceedingsTitle", "conferenceName", "volume", "pages", "publisher", "place",
+                        "DOI", "ISBN", "url", "abstractNote", "citationKey", "extra", "libraryCatalog"],
+    "preprint": ["title", "date", "repository", "archiveID", "DOI", "url", "abstractNote", "citationKey", "extra"],
 }
 
 
