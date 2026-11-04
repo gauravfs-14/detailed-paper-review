@@ -40,6 +40,12 @@ Language and presentation
 - Anonymization for double-blind venues (author names, self-citations written in the first person,
   acknowledgments, file metadata, repository links).
 - Leftovers: TODO, XXX, ??, comments, tracked changes, placeholder text, broken links, "[citation needed]".
+- Stray text (rule 8 in `agents/_evidence-rules.md`): text that would not appear in the finished paper,
+  such as AI-chat replies, revision notes, response-letter wording, placeholders or notes to co-authors.
+  There is no script for this, because no pattern list can predict what slips in. Every agent notices it
+  while doing its own task; here, the editorial readers judge every sentence for it explicitly. Also open
+  the source file itself for what extraction may hide: Word comments, tracked changes and highlighting;
+  LaTeX change or highlight commands outside comments.
 
 ## Splitting the work
 
@@ -50,6 +56,8 @@ paper.
 ## Output
 
 `phases/08-editorial.json`: `coverage` in `sections` (all parts read) and the checklist in `items`
+(including one item `"Stray text"`: `ok` only after every part was read for it, otherwise `issue` with the
+count)
 `{"item", "status": "ok|missing|issue|n/a", "location", "note"}`. Findings for every missing statement
 and every issue pattern. In fix mode, language fixes go into `fixes.json` as exact find/replace pairs;
 missing statements are reported for the author to write (do not invent ethics approvals, funding, or

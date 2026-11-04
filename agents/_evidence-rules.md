@@ -26,3 +26,20 @@ worthless, because the user relies on it to catch exactly the errors a language 
 6. **Real locations only.** Use the file and line from `manuscript.json` or the file itself. Never invent a
    page, line, table number, URL or quote.
 7. **Say what you did not do.** End with counts: checked, problems found, could not check (and why).
+8. **Notice stray text as you read.** This is not a separate pass and not a phrase list: no list can
+   predict what slips into a manuscript, so use judgment on everything you read for your own task
+   (sentences, captions, footnotes, table cells, headings, front and back matter). For each piece ask:
+   *would this text appear, written this way, in the finished paper a journal reader sees?* If not, it is
+   stray. It usually comes from the tools and steps used to write the paper, for example:
+   - text from an AI chat: a reply to the writer rather than prose for the reader, an offer, an apology,
+     a summary of what was changed, a fill-in-the-blank bracket;
+   - text from revising: notes about versions, uploads, reviewers or changes, response-letter wording,
+     before/after pairs, change or highlight markup left in;
+   - text from notes or documentation: to-dos, placeholders, instructions, notes to co-authors, file names,
+     formatting from another tool (Markdown, code), outline or slide-style fragments.
+   These are illustrations of the kind of thing to notice, not the definition. Anything else that does not
+   belong in the finished paper counts too. Add a finding (category `stray-text`, severity major; critical
+   in the title or abstract) quoting the text exactly with file and line, and say why it does not belong.
+   Use `issue_key` `stray-ai-text`, `stray-revision-text` or `stray-doc-text` (or `stray-text` for anything
+   else) so findings from different agents merge. Legitimate uses are not stray (a paper about LLMs quoting
+   model output, a methods section describing reviewer annotation); if unsure, flag it as a question.

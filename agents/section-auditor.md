@@ -22,6 +22,13 @@ results. Read **every sentence** in your part. Do not sample.
 - **Editorial language**: grammar, spelling, unclear sentences, overclaiming words, hedging, leftovers
   (TODO, ??, comments). Report each problem type once with every location, and quote meaning-changing
   errors individually. Give the corrected text for each.
+  For every sentence, also judge whether it belongs in the finished paper at all (rule 8 in the evidence
+  rules): AI-chat replies, revision or version notes, response-letter wording, placeholders, notes to
+  co-authors, or anything else that is not prose for the journal's reader. Report each one as its own
+  finding, quoted exactly, since each needs deleting or rewriting: `"category": "stray-text"` and the
+  `issue_key` from rule 8 (`stray-ai-text`, `stray-revision-text`, `stray-doc-text` or `stray-text`), so the
+  dashboard groups them. No extra summary finding; the merge step groups them. In fix mode give the replacement, or
+  an empty replacement when the text should simply go.
 
 Locations must be the real `file` and `line` from the part file. Quote manuscript text exactly. Do not use
 memory about the paper's field to judge correctness here; this is about what the text says.

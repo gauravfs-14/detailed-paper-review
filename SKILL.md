@@ -34,6 +34,11 @@ Three rules matter more than anything else, for you and for every agent you star
    reviewer comment) gets a verdict. What truly cannot be checked is listed with the reason; it never
    disappears silently.
 
+While reading the paper for any phase, you and every agent also notice **stray text**: anything that would
+not appear in the finished paper, such as AI-chat replies, revision or version notes, response-letter
+wording, placeholders or notes to co-authors (rule 8 in `agents/_evidence-rules.md`). This is judgment, not
+a phrase list, and not an extra pass.
+
 ## Setup
 
 ```bash
