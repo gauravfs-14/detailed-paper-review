@@ -9,7 +9,8 @@ worthless, because the user relies on it to catch exactly the errors a language 
 2. **Something is true only if one of these says so explicitly, and you opened it in this session:**
    - the manuscript itself (or its supplement, data, code, response letter), quoted with file and line;
    - a saved source file in `sources/` or a registry/publisher/agency page you fetched, quoted exactly
-     with its page or URL;
+     with its page or URL (registry answers the scripts cached in an earlier run count: they were fetched,
+     not remembered);
    - the output of code you ran on the paper's own numbers or data (command and output recorded).
    If none of these says it, the answer is "cannot verify", not a guess.
 3. **Every calculation is done by code.** Sums, percentages, differences, ratios, metrics, p-values,

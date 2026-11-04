@@ -47,6 +47,23 @@ eval "$(bash $SK/scripts/setup_env.sh)"        # sets $PY (private venv with PyM
 $PY -I $SK/scripts/preflight.py                 # network, packages, write access, report tools
 ```
 
+Preflight also reports the contact email, the OpenAlex key and Zotero. Act on its notes before starting:
+
+- **No OpenAlex key:** tell the user it is optional but makes lookups about 3 times faster with 10 times the
+  daily budget. You must not create the account for them (not even through OpenAlex's agent sign-up). They
+  sign up at https://openalex.org/signup, copy the key from https://openalex.org/settings/api-key, and run
+  `$PY $SK/scripts/configure.py openalex-key` in their own terminal, which stores it in the system
+  keychain. Never ask them to paste a key into the chat, and never write one into a file.
+- **No contact email:** ask which email to send to Crossref and OpenAlex, then
+  `$PY $SK/scripts/configure.py set-email <email>`.
+- **Zotero not ready:** the skill uses the Zotero desktop app as its paper library (`scripts/zotero_lib.py`).
+  Ask the user to do what preflight lists: install Zotero, open it, or turn on its local API. The skill
+  creates its "Detailed Paper Review" collection itself on first use. If they would rather not use Zotero,
+  continue without it.
+
+Registry answers are cached on disk (`~/.cache/detailed-paper-review/http-cache.sqlite`, 30 days) and every
+request is rate-limited per service, so reruns and later reviews do not repeat lookups.
+
 Do not start until preflight prints `READY`. If it prints `NOT READY`, follow its instructions (usually the
 agent's sandbox is blocking the network) and rerun it. Never run the reference or literature phases offline:
 the scripts stop on purpose rather than record lookups that never happened.
@@ -171,6 +188,20 @@ tries to find legal full text for abstract-only entries (`fetch_sources.py --add
 `review_tool.py merge-refs`, and add list-level findings (missing, uncited, duplicate, retracted, style)
 with IDs starting `REF-L`. `sources/TO_DOWNLOAD.md` lists papers the user should download by hand, with the
 claims that depend on each; it goes into the summary.
+
+`fetch_sources.py` looks in the user's Zotero library before downloading anything. After `merge-refs`, file
+the references in Zotero when it is ready:
+
+```bash
+$PY -I $SK/scripts/zotero_lib.py push --review $RV --dry-run   # what would be added or reused
+$PY -I $SK/scripts/zotero_lib.py push --review $RV
+```
+
+Papers already in the library are reused, never duplicated or edited. New items go into the "Detailed
+Paper Review" collection with metadata from the verified registry record (or the agent's confirmed
+`metadata`), the saved PDF, and tags (`dpr:<review>`, `dpr:verified` or `dpr:needs-check`, `dpr:fulltext`).
+Unverifiable references are not added. Tell the user the counts from `zotero.json`. `zotero_lib.py tidy`
+gives a read-only report of duplicates and missing fields in that collection.
 
 ### Phase 2: fact check (strict)
 

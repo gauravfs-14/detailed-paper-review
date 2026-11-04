@@ -20,7 +20,7 @@ import time
 import urllib.parse
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from dprlib import clean_doi, get_json, norm, now_iso, require_network, read_json, token_set_ratio, write_json  # noqa: E402
+from dprlib import clean_doi, get_json, norm, now_iso, require_network, network_summary, read_json, token_set_ratio, write_json  # noqa: E402
 
 OPENALEX = "https://api.openalex.org/works"
 
@@ -100,3 +100,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+    print(network_summary())

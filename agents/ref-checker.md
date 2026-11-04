@@ -39,6 +39,16 @@ For **each** key in your group, do all of this:
    rulebook. Write the corrected entry for anything that needs a fix, in the same format as the paper's
    source (BibTeX if .bib).
 
+For every reference that has **no matching registry record** (reports, standards, web pages, books found only
+in a catalog, conference papers found only on a proceedings site), also add `"metadata"` to its item: the
+clean, correct bibliographic data you confirmed on the page you opened, used to file the paper in the user's
+Zotero library. Shape:
+`{"type": "report|webpage|book|bookSection|conferencePaper|journalArticle|thesis|standard|dataset|computerProgram",
+"title": "...", "authors": [{"family": "...", "given": "..."} or {"name": "Organization Name"}], "date": "YYYY[-MM[-DD]]",
+"container": "journal, proceedings, book or website title", "publisher": "...", "institution": "issuing body",
+"number": "report or standard number", "volume": "...", "issue": "...", "pages": "...", "doi": "...", "url": "...",
+"source_url": "page where you confirmed it"}`. Leave out fields you could not confirm; never fill one from memory.
+
 Write `$RV/work/refs/<group>.json`:
 
 ```json

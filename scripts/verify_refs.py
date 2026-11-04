@@ -20,7 +20,7 @@ import sys
 import urllib.parse
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from dprlib import (bib_authors, clean_doi, family_key, get_json, http_get, norm, now_iso, require_network, parse_reference_text, read_json,  # noqa: E402
+from dprlib import (bib_authors, clean_doi, family_key, get_json, http_get, norm, now_iso, require_network, network_summary, parse_reference_text, read_json,  # noqa: E402
                     token_set_ratio, write_json)
 
 CROSSREF = "https://api.crossref.org/works"
@@ -111,10 +111,7 @@ FAILED = {}  # registry -> HTTP status, when a lookup could not be done (rate li
 
 
 def _oa(url):
-    key, mail = os.environ.get("OPENALEX_API_KEY"), os.environ.get("OPENALEX_MAILTO")
-    if key or mail:
-        url += ("&" if "?" in url else "?") + urllib.parse.urlencode({k: v for k, v in (("api_key", key), ("mailto", mail)) if v})
-    status, js = get_json(url)
+    status, js = get_json(url)  # key and contact email are added by dprlib.http_get
     if status in (0, 429) or status >= 500:
         FAILED["openalex"] = status
     return status, js
@@ -138,15 +135,12 @@ def lookup_openalex(doi=None, title=None):
     return [], True
 
 
-_S2_LOCK = __import__("threading").Lock()
 
 
 def lookup_s2(title):
     """Semantic Scholar title search: second open registry, strong on conference and arXiv papers.
-    Unauthenticated use allows about one request per second, so calls are serialised and paced."""
-    with _S2_LOCK:
-        time.sleep(1.2)
-        return _lookup_s2(title)
+    About one request per second: dprlib's per-host limiter paces and serialises these calls."""
+    return _lookup_s2(title)
 
 
 def _lookup_s2(title):
@@ -443,3 +437,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+    print(network_summary())

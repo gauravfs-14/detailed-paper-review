@@ -31,7 +31,8 @@ import sys
 import urllib.parse
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from dprlib import clean_doi, get_json, http_get, norm, now_iso, require_network, parse_reference_text, read_json, token_set_ratio, write_json  # noqa: E402
+import zotero_lib  # noqa: E402
+from dprlib import clean_doi, get_json, http_get, norm, now_iso, require_network, network_summary, parse_reference_text, read_json, token_set_ratio, write_json  # noqa: E402
 
 MIN_PDF_BYTES = 8000
 
@@ -118,6 +119,9 @@ def local_match(ref, local_dir, log):
     return None
 
 
+ZOTERO = {"on": False}
+
+
 def gather(ref, auto, review, local_dir, extra_urls=()):
     key = ref["ID"]
     src = os.path.join(review, "sources")
@@ -143,6 +147,25 @@ def gather(ref, auto, review, local_dir, extra_urls=()):
         pages = pdf_pages(dest)
         row.update(origin="local:" + lp)
         log(f"local PDF {lp}")
+
+    # 1b. the user's Zotero library (desktop app), so a paper already on the machine is not downloaded again
+    if not pages and ZOTERO["on"]:
+        try:
+            hit = zotero_lib.find(doi, title, next((r.get("year") for r in recs if r.get("year")), None))
+        except Exception as e:
+            hit = None
+            log(f"zotero lookup failed: {e}")
+        if hit and hit.get("pdf"):
+            zp = pdf_pages(hit["pdf"])
+            if title_in_pages(title, zp):
+                shutil.copyfile(hit["pdf"], dest)
+                pages = zp
+                row.update(origin=f"zotero:{hit['key']}")
+                log(f"Zotero item {hit['key']} ({hit['match']} match): PDF reused")
+            else:
+                log(f"Zotero item {hit['key']} has a PDF, but its first pages do not show this title: not used")
+        elif hit:
+            log(f"Zotero item {hit['key']} found, without a PDF")
 
     # 2. open-access locations
     urls = list(extra_urls)
@@ -270,6 +293,9 @@ def main():
     ap.add_argument("--add", action="append", default=[], help="key=url of a legal copy found by hand")
     a = ap.parse_args()
     require_network()
+    zs = zotero_lib.status(quiet=True)
+    ZOTERO["on"] = zs["running"] and zs["local_api"]
+    print("Zotero library: " + ("checked first for PDFs" if ZOTERO["on"] else "not available (" + "; ".join(zs["todo"]) + ")"))
     extra = {}
     for kv in a.add:
         k, _, u = kv.partition("=")
@@ -305,3 +331,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+    print(network_summary())

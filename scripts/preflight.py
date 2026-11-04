@@ -50,6 +50,14 @@ def main():
         res["write"] = True
     except Exception as e:
         res["write"] = f"{type(e).__name__}: {e}"
+    from dprlib import contact_email, secret
+    res["contact_email"] = contact_email()
+    res["openalex_key"] = bool(secret("openalex"))
+    try:
+        import zotero_lib
+        res["zotero"] = zotero_lib.status(quiet=True)
+    except Exception as e:
+        res["zotero"] = {"ready": False, "todo": [f"Zotero check failed: {e}"]}
     for t in ("pandoc", "xelatex", "latexmk", "pdflatex", "bibtex", "biber"):
         res["tools"][t] = bool(shutil.which(t))
 
@@ -66,6 +74,15 @@ def main():
     if res["write"] is not True:
         problems.append(f"Cannot write to {a.out}: {res['write']}")
     notes = []
+    if not res["contact_email"]:
+        notes.append("No contact email: Crossref and OpenAlex use their slower public limits. "
+                     "Run: $PY <skill>/scripts/configure.py set-email you@example.org")
+    if not res["openalex_key"]:
+        notes.append("No OpenAlex API key (optional, 3x faster and 10x the daily budget). The user creates a free "
+                     "account at https://openalex.org/signup (agents must not sign up for them), then runs "
+                     "`$PY <skill>/scripts/configure.py openalex-key` in their own terminal.")
+    if not res["zotero"].get("ready"):
+        notes.append("Zotero library not used: " + " ".join(res["zotero"].get("todo", [])))
     if not (res["tools"]["pandoc"] and res["tools"]["xelatex"]):
         notes.append("pandoc or xelatex missing: the dashboard works, but the PDF report will not be built.")
     if not (res["tools"]["latexmk"] or res["tools"]["pdflatex"]):

@@ -102,6 +102,9 @@ and a `location` (or `"location": {"section": "whole paper"}` when it is global)
 }
 ```
 
+References without a matching registry record also carry `"metadata"` (clean bibliographic data the agent
+confirmed on the page it opened; shape in `agents/ref-checker.md`). It is used to file the work in Zotero.
+
 `verdict`: `verified` (all fields match at least one authoritative record, no fix needed), `needs_fix`
 (any critical or major field error, wrong DOI, retracted, or a duplicate entry), `check` (a minor issue the
 author should look at, such as Early Access metadata drift), `unverifiable` (no authoritative record found

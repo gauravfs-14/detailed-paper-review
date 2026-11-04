@@ -34,7 +34,51 @@ mkdir -p ~/.agents/skills ~/.claude/skills && git clone https://github.com/gaura
 `setup_env.sh` creates a private Python environment at `~/.cache/detailed-paper-review/venv` with PyMuPDF
 and python-docx. It needs network access the first time. PDF reports also need `pandoc` and `xelatex`.
 
-Optional: set `OPENALEX_API_KEY` or `OPENALEX_MAILTO` for faster, more reliable OpenAlex lookups.
+### Recommended setup
+
+These are optional, but they make reviews faster and avoid repeated downloads.
+
+**Contact email.** Crossref and OpenAlex give faster limits to requests that include one:
+
+```bash
+~/.cache/detailed-paper-review/venv/bin/python ~/.agents/skills/detailed-paper-review/scripts/configure.py set-email you@example.org
+```
+
+**OpenAlex API key.** Free; about 3 times faster, with 10 times the daily budget. Create an account at
+https://openalex.org/signup and copy your key from https://openalex.org/settings/api-key. Then run this in
+your own terminal. It asks for the key and stores it in the macOS Keychain (or the Linux secret service),
+never in a file:
+
+```bash
+~/.cache/detailed-paper-review/venv/bin/python ~/.agents/skills/detailed-paper-review/scripts/configure.py openalex-key
+```
+
+The agent will not create the account for you. Check your settings at any time with `configure.py status`.
+
+**Zotero as the paper library.** With the Zotero desktop app (version 7 or later) open, and its local API
+turned on (Zotero Settings > Advanced > "Allow other applications on this computer to communicate with
+Zotero"), the skill:
+
+- looks in your library before downloading a paper, and reuses the PDF you already have;
+- files each review's verified references in a "Detailed Paper Review" collection, which it creates itself
+  the first time;
+- never duplicates or edits papers you already have, and never touches other collections;
+- fills metadata from the verified registry record, attaches the saved PDF, sets the citation key, and adds
+  the tags `dpr:<review>`, `dpr:verified` or `dpr:needs-check`, and `dpr:fulltext`.
+
+No Zotero API key is needed: it works through the desktop app, like the browser connector.
+
+### Requests and caching
+
+Each service is rate-limited separately, below its published limits:
+- Crossref: 5 per second without a contact email, 10 with one;
+- OpenAlex: 10 per second without a key, 30 with one;
+- Semantic Scholar: about 1 per second;
+- arXiv: 1 every 3 seconds.
+
+Retry-After and Backoff headers are respected. Registry answers are cached for 30 days in
+`~/.cache/detailed-paper-review/http-cache.sqlite`, so a rerun or a later review does not look up the same
+paper again.
 
 ## Use
 
