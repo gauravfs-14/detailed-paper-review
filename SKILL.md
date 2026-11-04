@@ -288,3 +288,5 @@ named, the could-not-check list, the papers to download, and links to the dashbo
 - `references/`: one rulebook per phase plus `output-schema.md`. Load only the one you are running.
 - `agents/`: `_evidence-rules.md` (in every prompt) and the briefs.
 - `assets/dashboard/index.html`: dashboard template, filled by `build_dashboard.py`. Do not rewrite it.
+- `pipeline.json`, `PIPELINE.md`, `skill.json`, `agents/host/`: the same workflow as a list of steps, for apps
+  that run the review themselves (Lexiq Writer). You do not need them when you follow this file.

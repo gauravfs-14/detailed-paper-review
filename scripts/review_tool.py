@@ -13,6 +13,17 @@ Subcommands
   attach-second    attach second-checker verdicts (work/factcheck/second-*.json) to the batch results
   dedupe           group findings that describe the same problem across phases -> phases/_issues.json
 
+Task plans for apps that run the review step by step (see pipeline.json). Each writes a plan file with
+{"tasks": [{"id", "input", "output"}]}, paths relative to the review folder:
+  plan-refs           groups of reference keys for ref-checker agents   -> work/refs/plan.json
+  plan-second         flagged items plus a sample of supported ones for second checkers -> work/factcheck/second-plan.json
+  plan-adjudication   items where the two checkers disagree             -> work/factcheck/adjudication-plan.json
+  apply-adjudication  copy the decisions (work/factcheck/adjudication.json) into the batch results
+  plan-redo           items whose quote was not found in the source, for a fresh fact checker -> work/factcheck/redo-plan.json
+  apply-redo          replace those items in the batch results with the fresh verdicts
+  apply-ref-list      add list-level reference findings (work/refs/list.json) to phases/01-references.json
+  apply-synthesis     add the peer-review synthesis (work/review/synthesis.json) to phases/09-peer-review.json
+
 The rule these tools enforce: a phase is "complete" only when the files prove it. An agent saying
 "done" is never enough.
 """
@@ -121,6 +132,8 @@ def plan_factcheck(review, max_claims=15, max_chars=220000):
                       "citation_instances": sum(len(s["cites"]) for s in sents),
                       "sources": len(keys), "no_text": [s["key"] for s in sources if s["kind"] == "none"]})
     write_json(os.path.join(out_dir, "index.json"), {"generated": now_iso(), "batches": index,
+                                                    "tasks": [{"id": b["batch"], "input": f"work/factcheck/{b['batch']}.json",
+                                                               "output": f"work/factcheck/{b['batch']}.result.json"} for b in index],
                                                     "total_citing_sentences": len(citing),
                                                     "total_citation_instances": sum(len(s["cites"]) for s in citing)})
     for b in index:
@@ -436,6 +449,10 @@ def plan_sections(review, max_words=2500):
             "sentences": [{"id": x["id"], "file": x["file"], "line": x["line"], "section": s["title"], "text": x["text"]}
                           for s, ss in g for x in ss]})
         print(f"part-{i:02d}: {', '.join(s['title'] for s, _ in g)}")
+    words = sum(len(x["text"].split()) for x in ms["sentences"])
+    write_json(os.path.join(out_dir, "plan.json"), {
+        "generated": now_iso(), "words": words, "parts": len(groups),
+        "tasks": [{"id": f"part-{i:02d}", "input": f"work/sections/part-{i:02d}.json"} for i in range(1, len(groups) + 1)]})
 
 
 def attach_second(review):
@@ -473,6 +490,155 @@ def attach_second(review):
           "(add second_check.adjudication with the reason, then run merge-factcheck)")
 
 
+def plan_refs(review, size=12):
+    """Groups of reference keys (aliases share their original's verdict, so they are not checked twice)."""
+    ms = read_json(os.path.join(review, "manuscript", "manuscript.json"))
+    keys = [r["ID"] for r in ms["references"] if not r.get("alias_of")]
+    groups = [keys[i:i + size] for i in range(0, len(keys), size)]
+    out_dir = os.path.join(review, "work", "refs")
+    os.makedirs(out_dir, exist_ok=True)
+    tasks = []
+    for i, g in enumerate(groups, 1):
+        gid = f"g{i:02d}"
+        write_json(os.path.join(out_dir, f"{gid}.input.json"), {"group": gid, "keys": g, "output_file": f"work/refs/{gid}.json"})
+        tasks.append({"id": gid, "input": f"work/refs/{gid}.input.json", "output": f"work/refs/{gid}.json", "keys": g})
+    write_json(os.path.join(out_dir, "plan.json"), {"generated": now_iso(), "references": len(keys), "tasks": tasks})
+    print(f"{len(tasks)} groups for {len(keys)} references")
+
+
+def _batch_items(review):
+    for f in sorted(glob.glob(os.path.join(review, "work", "factcheck", "batch-*.result.json"))):
+        for it in (read_json(f) or {}).get("items", []):
+            yield f, it
+
+
+def plan_second(review, per_task=15):
+    """Every item that is not supported, plus at least 10% (minimum 3) of supported ones, chosen by a stable
+    hash so a rerun picks the same sample. The inputs leave out the first verdict, quote and reasoning."""
+    import hashlib
+    ms = read_json(os.path.join(review, "manuscript", "manuscript.json"))
+    sent = {s["id"]: s for s in ms["sentences"]}
+    items = [it for _, it in _batch_items(review)]
+    flagged = [it for it in items if it.get("verdict") != "supported"]
+    supported = sorted((it for it in items if it.get("verdict") == "supported"),
+                       key=lambda it: hashlib.sha1(str(it.get("id")).encode()).hexdigest())
+    n_sample = min(len(supported), max(3, -(-len(supported) // 10)))
+    # items checked in an earlier round keep their second check; only new ones (e.g. redone items) are sent
+    chosen = [it for it in flagged + supported[:n_sample] if not (it.get("second_check") or {}).get("verdict")]
+    out_dir = os.path.join(review, "work", "factcheck")
+    for f in glob.glob(os.path.join(out_dir, "second-input-*.json")):
+        os.remove(f)
+    tasks = []
+    for i in range(0, len(chosen), per_task):
+        n = i // per_task + 1
+        rows = []
+        for it in chosen[i:i + per_task]:
+            s = sent.get(it.get("sentence_id"), {})
+            p, kind, _ = ensure_txt(review, it.get("cite"))
+            rows.append({"id": it.get("id"), "sentence": s.get("text", ""), "claim": it.get("claim", ""), "cite": it.get("cite"),
+                         "text_file": os.path.relpath(p, review) if p else None, "source_kind": kind})
+        inp = f"work/factcheck/second-input-{n:02d}.json"
+        write_json(os.path.join(review, inp), {"items": rows, "output_file": f"work/factcheck/second-{n:02d}.json"})
+        tasks.append({"id": f"second-{n:02d}", "input": inp, "output": f"work/factcheck/second-{n:02d}.json"})
+    write_json(os.path.join(out_dir, "second-plan.json"), {"generated": now_iso(), "flagged": len(flagged),
+                                                          "sampled_supported": n_sample, "tasks": tasks})
+    print(f"{len(chosen)} item(s) need a second check ({len(flagged)} flagged, {n_sample} supported in the sample), {len(tasks)} task(s)")
+
+
+def plan_adjudication(review):
+    """Items where the first and second checker disagree and no decision is recorded yet."""
+    rows = []
+    for _, it in _batch_items(review):
+        sc = it.get("second_check") or {}
+        if sc.get("verdict") and not sc.get("agrees") and not sc.get("adjudication"):
+            rows.append({"id": it.get("id"), "cite": it.get("cite"), "claim": it.get("claim"), "sentence_id": it.get("sentence_id"),
+                         "first": {"verdict": it.get("verdict"), "evidence": it.get("evidence", []), "reasoning": it.get("reasoning", "")},
+                         "second": {"verdict": sc.get("verdict"), "note": sc.get("note", ""), "quote_match": sc.get("quote_match")}})
+    out_dir = os.path.join(review, "work", "factcheck")
+    tasks = []
+    if rows:
+        write_json(os.path.join(out_dir, "adjudication-input.json"), {"items": rows, "output_file": "work/factcheck/adjudication.json"})
+        tasks.append({"id": "adjudication", "input": "work/factcheck/adjudication-input.json", "output": "work/factcheck/adjudication.json"})
+    write_json(os.path.join(out_dir, "adjudication-plan.json"), {"generated": now_iso(), "disagreements": len(rows), "tasks": tasks})
+    print(f"{len(rows)} disagreement(s) need a decision")
+
+
+def apply_adjudication(review):
+    """work/factcheck/adjudication.json: {"items": [{"id", "verdict", "reason"}]}. The decided verdict becomes the
+    item's verdict (the first one is kept as first_verdict) and the reason is recorded as second_check.adjudication."""
+    dec = {d["id"]: d for d in (read_json(os.path.join(review, "work", "factcheck", "adjudication.json")) or {}).get("items", [])}
+    n = 0
+    for f in sorted(glob.glob(os.path.join(review, "work", "factcheck", "batch-*.result.json"))):
+        d = read_json(f)
+        changed = False
+        for it in d.get("items", []):
+            x = dec.get(it.get("id"))
+            if not x or not it.get("second_check") or x.get("verdict") not in FACT_VERDICTS:
+                continue
+            if x["verdict"] != it.get("verdict"):
+                it.setdefault("first_verdict", it.get("verdict"))
+                it["verdict"] = x["verdict"]
+            it["second_check"]["adjudication"] = f"{x['verdict']}: {x.get('reason', '')}".strip()
+            n += 1
+            changed = True
+        if changed:
+            write_json(f, d)
+    print(f"recorded {n} decision(s)")
+
+
+def plan_redo(review, per_task=15):
+    """Items 'supported' or 'partial' whose quote verify-quotes could not find, in batch-file shape, for a fresh agent."""
+    ph = read_json(os.path.join(review, "phases", "02-factcheck.json")) or {}
+    ms = read_json(os.path.join(review, "manuscript", "manuscript.json"))
+    sent = {s["id"]: s for s in ms["sentences"]}
+    failed = [it for it in ph.get("items", []) if it.get("quote_check_failed")]
+    out_dir = os.path.join(review, "work", "factcheck")
+    for f in glob.glob(os.path.join(out_dir, "redo-*.json")):
+        os.remove(f)
+    tasks = []
+    for i in range(0, len(failed), per_task):
+        n = i // per_task + 1
+        chunk = failed[i:i + per_task]
+        keys = sorted({it["cite"] for it in chunk})
+        sources = []
+        for k in keys:
+            p, kind, chars = ensure_txt(review, k)
+            sources.append({"key": k, "kind": kind, "text_file": os.path.relpath(p, review) if p else None, "chars": chars})
+        sents = []
+        for it in chunk:  # one entry per (sentence, cite) so the agent re-checks only the failed pair
+            s = sent.get(it.get("sentence_id"), {})
+            sents.append({"id": s.get("id"), "file": s.get("file"), "line": s.get("line"), "text": s.get("text"),
+                          "raw": s.get("raw"), "cites": [it["cite"]], "item_id": it.get("id")})
+        bid = f"redo-{n:02d}"
+        write_json(os.path.join(out_dir, bid + ".json"), {"batch": bid, "output_file": f"work/factcheck/{bid}.result.json",
+                                                         "note": "Earlier quotes for these pairs were not found in the source. Check them afresh.",
+                                                         "sentences": sents, "sources": sources})
+        tasks.append({"id": bid, "input": f"work/factcheck/{bid}.json", "output": f"work/factcheck/{bid}.result.json"})
+    write_json(os.path.join(out_dir, "redo-plan.json"), {"generated": now_iso(), "items": len(failed), "tasks": tasks})
+    print(f"{len(failed)} item(s) to redo, {len(tasks)} task(s)")
+
+
+def apply_redo(review):
+    """Replace each redone (sentence_id, cite) pair in the batch results with the fresh verdict, keeping its id."""
+    fresh = {}
+    for f in sorted(glob.glob(os.path.join(review, "work", "factcheck", "redo-*.result.json"))):
+        for it in (read_json(f) or {}).get("items", []):
+            fresh[(it.get("sentence_id"), it.get("cite"))] = it
+    n = 0
+    for f in sorted(glob.glob(os.path.join(review, "work", "factcheck", "batch-*.result.json"))):
+        d = read_json(f)
+        changed = False
+        for i, it in enumerate(d.get("items", [])):
+            x = fresh.get((it.get("sentence_id"), it.get("cite")))
+            if x:
+                d["items"][i] = {**x, "id": it.get("id"), "redone": True}
+                n += 1
+                changed = True
+        if changed:
+            write_json(f, d)
+    print(f"replaced {n} item(s) with fresh verdicts")
+
+
 def merge_refs(review):
     ms = read_json(os.path.join(review, "manuscript", "manuscript.json"))
     items, findings = {}, []
@@ -501,6 +667,38 @@ def merge_refs(review):
     print(f"merged {len(rows)} reference verdicts; coverage {ph['coverage']['checked']}/{ph['coverage']['total']}")
     if missing:
         print("  NOT DONE: no verdict for", ", ".join(missing))
+
+
+def apply_ref_list(review):
+    """work/refs/list.json: {"summary", "findings": [REF-L...]}. Replaces earlier list-level findings."""
+    lst = read_json(os.path.join(review, "work", "refs", "list.json"))
+    path = os.path.join(review, "phases", "01-references.json")
+    ph = read_json(path)
+    if not lst or not ph:
+        sys.exit("need work/refs/list.json and phases/01-references.json (run merge-refs first)")
+    extra = [f for f in lst.get("findings", []) if str(f.get("id", "")).startswith("REF-L")]
+    ph["findings"] = [f for f in ph.get("findings", []) if not str(f.get("id", "")).startswith("REF-L")] + extra
+    if lst.get("summary"):
+        ph["summary"] = lst["summary"]
+    write_json(path, ph)
+    print(f"added {len(extra)} list-level finding(s)")
+
+
+def apply_synthesis(review):
+    """work/review/synthesis.json: {"summary", "synthesis", "findings": [PR-...]}. Written after every report is in."""
+    syn = read_json(os.path.join(review, "work", "review", "synthesis.json"))
+    path = os.path.join(review, "phases", "09-peer-review.json")
+    ph = read_json(path)
+    if not syn or not ph:
+        sys.exit("need work/review/synthesis.json and phases/09-peer-review.json (run merge-review first)")
+    ph["synthesis"] = syn.get("synthesis", "")
+    ph["summary"] = syn.get("summary", ph.get("summary", ""))
+    ph["findings"] = [f for f in syn.get("findings", []) if str(f.get("id", "")).startswith("PR-")]
+    cov = ph.get("coverage") or {}
+    ph["status"] = "complete" if ph["synthesis"] and cov.get("checked", 0) >= max(cov.get("total", 0), 1) else "incomplete"
+    ph["status_reason"] = "" if ph["status"] == "complete" else (ph.get("status_reason") or "a reviewer report or the synthesis is missing")
+    write_json(path, ph)
+    print(f"synthesis added; status={ph['status']}")
 
 
 def merge_review(review):
@@ -592,7 +790,9 @@ def dedupe(review):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("cmd", choices=["plan-factcheck", "verify-quotes", "merge-factcheck", "coverage", "plan-sections",
-                                       "merge-refs", "merge-review", "dedupe", "attach-second"])
+                                       "merge-refs", "merge-review", "dedupe", "attach-second", "plan-refs", "plan-second",
+                                       "plan-adjudication", "apply-adjudication", "plan-redo", "apply-redo",
+                                       "apply-ref-list", "apply-synthesis"])
     ap.add_argument("--review", required=True)
     ap.add_argument("--max-claims", type=int, default=15)
     a = ap.parse_args()
@@ -614,6 +814,22 @@ def main():
         dedupe(a.review)
     elif a.cmd == "attach-second":
         attach_second(a.review)
+    elif a.cmd == "plan-refs":
+        plan_refs(a.review)
+    elif a.cmd == "plan-second":
+        plan_second(a.review)
+    elif a.cmd == "plan-adjudication":
+        plan_adjudication(a.review)
+    elif a.cmd == "apply-adjudication":
+        apply_adjudication(a.review)
+    elif a.cmd == "plan-redo":
+        plan_redo(a.review)
+    elif a.cmd == "apply-redo":
+        apply_redo(a.review)
+    elif a.cmd == "apply-ref-list":
+        apply_ref_list(a.review)
+    elif a.cmd == "apply-synthesis":
+        apply_synthesis(a.review)
 
 
 if __name__ == "__main__":

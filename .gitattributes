@@ -1,0 +1,5 @@
+# Not part of the released skill (git archive leaves these out)
+tests/ export-ignore
+tools/ export-ignore
+.github/ export-ignore
+.gitattributes export-ignore

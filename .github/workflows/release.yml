@@ -1,0 +1,34 @@
+# Push a tag like v1.3.0 (matching "version" in skill.json) to publish a release. Apps that ship the skill
+# (Lexiq Writer) download the zip from the latest release and check it against the .sha256 file.
+name: release
+on:
+  push:
+    tags: ["v*"]
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m unittest discover -s tests -v
+      - name: Check the tag matches skill.json
+        run: |
+          v=$(python -c "import json; print(json.load(open('skill.json'))['version'])")
+          [ "v$v" = "$GITHUB_REF_NAME" ] || { echo "skill.json says $v but the tag is $GITHUB_REF_NAME"; exit 1; }
+      - name: Build the zip
+        run: |
+          name="detailed-paper-review-${GITHUB_REF_NAME#v}"
+          git archive --format=zip --prefix=detailed-paper-review/ -o "$name.zip" HEAD
+          sha256sum "$name.zip" | cut -d' ' -f1 > "$name.zip.sha256"
+          cp skill.json "$name.skill.json"
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          name="detailed-paper-review-${GITHUB_REF_NAME#v}"
+          gh release create "$GITHUB_REF_NAME" "$name.zip" "$name.zip.sha256" "$name.skill.json" \
+            --title "$GITHUB_REF_NAME" --generate-notes

@@ -210,6 +210,7 @@ def main():
         fh.write("window.REVIEW = ")
         json.dump(data, fh, ensure_ascii=False)
         fh.write(";\n")
+    write_json(os.path.join(dash, "data.json"), data)  # the same verified data, for apps that show it themselves
     shutil.copyfile(TEMPLATE, os.path.join(dash, "index.html"))
     vend = os.path.join(os.path.dirname(TEMPLATE), "vendor")  # fonts and icons, so it works offline
     if os.path.isdir(vend):

@@ -1,0 +1,7 @@
+{
+  "name": "detailed-paper-review",
+  "version": "1.3.0",
+  "pipeline_schema": 1,
+  "results_schema": 1,
+  "python_packages": ["pymupdf", "python-docx"]
+}
