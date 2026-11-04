@@ -87,6 +87,7 @@ All are optional; without them the skill behaves exactly as when an agent runs i
 | `DPR_MAILTO`, `OPENALEX_API_KEY`, `SEMANTIC_SCHOLAR_API_KEY` | contact email and keys, instead of the config file and keychain |
 | `DPR_ZOTERO_COLLECTION` | the Zotero collection to file papers in (default: config `zotero_collection`, else "Detailed Paper Review") |
 | `DPR_ZOTERO_EXISTING=link` | for papers the library already has, only record which item it is: no collection, tag or field change |
+| `DPR_ZOTERO=on` / `off` | the app decided whether this review files papers: `off` never writes (including the automatic sync after `fetch_sources.py` and `build_dashboard.py`); `on` syncs even if this copy's setup skipped Zotero |
 | `ZOTERO_LOCAL_API_KEY` with `DPR_ZOTERO_KEYCHAIN=0` | use the host's own Zotero key, and never read or store one in the keychain |
 
 `zotero_lib.py` takes a lock in the cache folder (`zotero-write.lock`, a directory) while it looks a paper up

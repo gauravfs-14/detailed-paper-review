@@ -24,6 +24,7 @@ Settings for apps that run the skill (environment; see PIPELINE.md). Without the
   DPR_ZOTERO_COLLECTION      collection name (else config.json "zotero_collection", else "Detailed Paper Review")
   DPR_ZOTERO_EXISTING=link   papers already in the library are only linked: no collection, tag or field change
   DPR_ZOTERO_KEYCHAIN=0      use ZOTERO_LOCAL_API_KEY only; never read or store a key in the keychain
+  DPR_ZOTERO=on|off          the app decided: off never writes (push, sync); on syncs even if setup skipped Zotero
 Looking a paper up and creating it happens under a lock (zotero-write.lock in the cache folder), so two
 programs filing at the same time cannot create the same paper twice.
 
@@ -74,6 +75,13 @@ def existing_mode():
     """What a push does with a paper the library already has. "update" (the default): file it in the collection,
     tag it and clean its metadata. "link": only record which item it is; the item is not changed at all."""
     return "link" if os.environ.get("DPR_ZOTERO_EXISTING", "").strip().lower() == "link" else "update"
+
+
+def host_setting():
+    """DPR_ZOTERO=on|off: an app running the skill (Lexiq Writer) decided whether this review files papers in Zotero.
+    "off": push and sync never write. "on": sync runs even if this copy's own setup skipped Zotero. Unset: as usual."""
+    v = os.environ.get("DPR_ZOTERO", "").strip().lower()
+    return v if v in ("on", "off") else None
 
 
 def use_keychain():
@@ -668,6 +676,8 @@ def _ready(dry_run):
 
 
 def push(rv, dry_run=False, only=None, interactive=True, quiet=False):
+    if host_setting() == "off":
+        sys.exit("Zotero is off for this review (DPR_ZOTERO=off).")
     _STATE["interactive"] = interactive
     st = _ready(dry_run)
     ph = read_json(os.path.join(rv, "phases", "01-references.json"))
@@ -741,10 +751,12 @@ def sync(rv, quiet=False):
     """Incremental push, safe to run any time (after downloads, after every dashboard build): files references
     that are new or newly confirmed, and attaches PDFs saved since the last push. Runs only after the review's
     first push, never shows Zotero's access dialog, and returns a one-line status."""
+    if host_setting() == "off":
+        return "Zotero: off for this review"
     prev = read_json(os.path.join(rv, "zotero.json"))
     if not prev:
         return "Zotero: not filed yet (the first push happens at the end of phase 1)"
-    if "zotero" in set(load_config().get("skipped_setup", [])):
+    if host_setting() != "on" and "zotero" in set(load_config().get("skipped_setup", [])):
         return "Zotero: skipped by the user"
     st = status(quiet=True)
     if not st["writable"]:

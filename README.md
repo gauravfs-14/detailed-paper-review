@@ -154,7 +154,7 @@ app can run it with any model. [PIPELINE.md](PIPELINE.md) explains the format an
 pass. Lexiq Writer ships a copy of this skill and updates it from this repo's releases. It keeps its own
 Zotero key and collection, so it never conflicts with a copy you installed yourself.
 
-Releases: set `version` in `skill.json`, then push a matching tag (`git tag v1.3.0 && git push --tags`). The
+Releases: set `version` in `skill.json`, then push a matching tag (`git tag v0.2.0 && git push --tags`). The
 release workflow runs the tests and publishes `detailed-paper-review-<version>.zip` with its checksum.
 
 Tests: `python -m unittest discover -s tests` (no network needed; Zotero is simulated).

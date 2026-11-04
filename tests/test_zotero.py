@@ -108,6 +108,47 @@ class ZoteroFiling(unittest.TestCase):
         self.assertEqual(len([c for c in self.lib.collections.values() if c["name"] == "Detailed Paper Review"]), 1)
 
 
+    def run_cmd(self, cmd, rv, **extra):
+        return subprocess.run([sys.executable, "-I", os.path.join(SCRIPTS, "zotero_lib.py"), cmd, "--review", rv],
+                              env=self.env(**extra), capture_output=True, text=True, timeout=60)
+
+    def test_sync_follows_the_host_settings(self):
+        rv = make_review(self.tmp.name)
+        host = dict(DPR_ZOTERO="on", DPR_ZOTERO_EXISTING="link", DPR_ZOTERO_COLLECTION="Lexiq Writer")
+        self.push(rv, **host)
+        # a second, newly confirmed reference appears later; one the library already has appears too
+        k = self.lib.add_item({"itemType": "report", "title": "Wombat Burrows of Tasmania", "date": "2021", "collections": ["MINE0001"]})
+        with open(os.path.join(rv, "phases", "01-references.json")) as fh:
+            ph = json.load(fh)
+        ph["items"] += [{"key": "jones2022", "verdict": "verified", "metadata": {"type": "report", "title": "Koala Sleep in the Wild", "date": "2022", "authors": [{"family": "Jones", "given": "Ann"}]}},
+                        {"key": "lee2021", "verdict": "verified", "metadata": {"type": "report", "title": "Wombat Burrows of Tasmania", "date": "2021", "authors": [{"family": "Lee", "given": "Bo"}]}}]
+        with open(os.path.join(rv, "phases", "01-references.json"), "w") as fh:
+            json.dump(ph, fh)
+        # the user's own copy skipped Zotero in its setup; the host said "on", so sync still runs
+        os.makedirs(os.path.join(self.tmp.name, "config"), exist_ok=True)
+        with open(os.path.join(self.tmp.name, "config", "config.json"), "w") as fh:
+            json.dump({"skipped_setup": ["zotero"]}, fh)
+        r = self.run_cmd("sync", rv, **host)
+        self.assertIn("synced 2", r.stdout, r.stdout + r.stderr)
+        z = json.load(open(os.path.join(rv, "zotero.json")))
+        self.assertEqual(set(z["items"]), {"smith2020", "jones2022", "lee2021"})  # merged, nothing dropped
+        self.assertEqual(z["items"]["lee2021"]["status"], "linked")
+        self.assertEqual(self.lib.items[k]["collections"], ["MINE0001"])  # the user's item untouched
+        col = self.collection("Lexiq Writer")
+        self.assertIn(col, self.lib.items[z["items"]["jones2022"]["zotero_key"]]["collections"])
+        self.assertIn("up to date", self.run_cmd("sync", rv, **host).stdout)  # nothing left to do, linked items included
+
+    def test_host_off_never_writes(self):
+        rv = make_review(self.tmp.name)
+        r = self.run_cmd("push", rv, DPR_ZOTERO="off")
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("off for this review", r.stdout + r.stderr)
+        self.push(rv)  # an earlier push, then the host turns Zotero off
+        writes = len(self.lib.writes)
+        self.assertIn("off for this review", self.run_cmd("sync", rv, DPR_ZOTERO="off").stdout)
+        self.assertEqual(len(self.lib.writes), writes)
+
+
 class Defaults(unittest.TestCase):
     """With no settings, the functions report today's behaviour."""
 
