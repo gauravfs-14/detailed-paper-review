@@ -327,6 +327,10 @@ def main():
     if counts["none"]:
         print("NO TEXT FOR:", ", ".join(r["key"] for r in allrows if r["kind"] == "none"),
               "\n-> claims citing these cannot be fact-checked until the user supplies the PDF (--local-pdfs).")
+    try:  # papers saved after the review's first Zotero push are filed and attached automatically
+        print(zotero_lib.sync(a.review, quiet=True))
+    except Exception as e:
+        print(f"Zotero: sync skipped ({e})")
 
 
 if __name__ == "__main__":

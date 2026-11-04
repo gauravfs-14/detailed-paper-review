@@ -70,6 +70,8 @@ API key is needed. The first time the skill writes, Zotero asks for access; clic
 - fills empty fields, corrects only substantive errors (not case or punctuation), attaches missing PDFs,
   sets the citation key, and tags each paper `dpr:<review>`;
 - logs every change with its old value, so `zotero_lib.py undo` restores it.
+- keeps Zotero up to date for the rest of the review: references added or confirmed later, and PDFs you
+  download afterwards from the review's to-download list, are filed automatically.
 
 `zotero_lib.py clean` cleans everything in the collection, and `zotero_lib.py tidy` reports duplicates,
 missing fields and initials that no source could expand. Zotero 7 to 9 can be read but not edited.

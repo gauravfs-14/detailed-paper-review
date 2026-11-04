@@ -222,6 +222,11 @@ def main():
         print(f"  {p['status']:<11} {p['phase']:<22} {p.get('status_reason', '')}")
     if incomplete:
         print(f"{len(incomplete)} phase(s) are not complete. Do not report the review as finished.")
+    try:  # keep Zotero in step with the review (new references, PDFs added later); never prompts
+        import zotero_lib
+        print(zotero_lib.sync(rv, quiet=True))
+    except Exception as e:
+        print(f"Zotero: sync skipped ({e})")
     if a.open:
         subprocess.run(["open", os.path.join(dash, "index.html")], check=False)
 

@@ -24,6 +24,7 @@ Commands:
   status                                    Zotero version, local API, write access, collection
   find --doi D | --title T                  look up a paper (item key and PDF path)
   push --review RV [--dry-run] [--only k1,k2]
+  sync --review RV                          file only what is new since the last push (runs automatically)
   clean [--dry-run]                         clean the metadata of every item in the collection
   undo --review RV | --log FILE             restore every field a push or clean changed
   tidy                                      read-only report: duplicates and missing fields in the collection
@@ -50,7 +51,11 @@ BASE = "http://localhost:23119"
 API = BASE + "/api/users/0"
 APP_NAME = "Detailed Paper Review"
 KEY_ACCOUNT = "zotero-local"
-_STATE = {"server_id": None, "key": None, "fields": {}}
+_STATE = {"server_id": None, "key": None, "fields": {}, "interactive": True}
+
+
+class NoAccess(Exception):
+    """Write access has not been granted yet, and this run may not show Zotero's dialog (background sync)."""
 
 
 def collection_name():
@@ -143,6 +148,8 @@ def write(method, path, body=None, headers=None, form=False):
     st = None
     for attempt in range(2):
         if not _STATE["key"]:
+            if not _STATE["interactive"]:
+                raise NoAccess("Zotero write access not granted yet; run `zotero_lib.py push --review RV` once")
             _authorize()
         hdrs = {"Zotero-Server-ID": _STATE["server_id"] or "", "Zotero-API-Key": _STATE["key"]}
         if form:
@@ -633,7 +640,8 @@ def _ready(dry_run):
     return st
 
 
-def push(rv, dry_run=False, only=None):
+def push(rv, dry_run=False, only=None, interactive=True, quiet=False):
+    _STATE["interactive"] = interactive
     st = _ready(dry_run)
     ph = read_json(os.path.join(rv, "phases", "01-references.json"))
     if not ph:
@@ -678,6 +686,7 @@ def push(rv, dry_run=False, only=None):
                     rec["error"] = err
             if pdf and not hit["pdf_attachment"]:
                 rec["pdf"] = "would attach" if dry_run else (upload_pdf(hit["key"], pdf)[1] or "attached")
+            rec["has_pdf"] = bool(hit["pdf_attachment"]) or rec.get("pdf") == "attached"
         else:
             new_item["tags"] = [{"tag": review_tag}]
             if dry_run:
@@ -691,17 +700,70 @@ def push(rv, dry_run=False, only=None):
                     _log_change({"run": run, "source": rv, "item": zk, "created": True})
                     if pdf:
                         rec["pdf"] = upload_pdf(zk, pdf)[1] or "attached"
+                    rec["has_pdf"] = rec.get("pdf") == "attached"
                 else:
                     rec.update(status="add_failed", error=f"HTTP {s2}: {str(r2)[:300]}")
         if rec.get("zotero_key"):
             rec["select"] = f"zotero://select/library/items/{rec['zotero_key']}"
+        old = (prev.get("items") or {}).get(key) or {}
+        if "history" not in old and old.get("status") == "updated" and old.get("changes"):
+            old["history"] = [{"run": prev.get("run"), "changes": old["changes"]}]  # records from before history existed
+        rec["history"] = old.get("history", []) + ([{"run": run, "changes": rec["changes"]}]
+                                                  if rec.get("status") == "updated" else [])
         out["items"][key] = rec
-    if not dry_run:
-        write_json(os.path.join(rv, "zotero.json"), out)
+    if not dry_run:  # merge with earlier runs, so a partial or incremental push never drops what was filed before
+        merged = dict(prev, collection=out["collection"], collection_key=col, run=run, dry_run=False)
+        merged["items"] = {**(prev.get("items") or {}), **out["items"]}
+        write_json(os.path.join(rv, "zotero.json"), merged)
     from collections import Counter
-    print(json.dumps(out, indent=1, ensure_ascii=False) if dry_run else
-          f"Zotero: {dict(Counter(v['status'] for v in out['items'].values()))} -> {os.path.join(rv, 'zotero.json')}")
+    if not quiet:
+        print(json.dumps(out, indent=1, ensure_ascii=False) if dry_run else
+              f"Zotero: {dict(Counter(v['status'] for v in out['items'].values()))} -> {os.path.join(rv, 'zotero.json')}")
     return out
+
+
+CONFIRMED = lambda v: v and v not in ("unverifiable", "not_found", "fabricated")
+
+
+def sync(rv, quiet=False):
+    """Incremental push, safe to run any time (after downloads, after every dashboard build): files references
+    that are new or newly confirmed, and attaches PDFs saved since the last push. Runs only after the review's
+    first push, never shows Zotero's access dialog, and returns a one-line status."""
+    prev = read_json(os.path.join(rv, "zotero.json"))
+    if not prev:
+        return "Zotero: not filed yet (the first push happens at the end of phase 1)"
+    if "zotero" in set(load_config().get("skipped_setup", [])):
+        return "Zotero: skipped by the user"
+    st = status(quiet=True)
+    if not st["writable"]:
+        return "Zotero: not synced (" + "; ".join(st["todo"] or ["not writable"]) + ")"
+    ph = read_json(os.path.join(rv, "phases", "01-references.json"), {}) or {}
+    man = {r["key"]: r for r in (read_json(os.path.join(rv, "sources", "manifest.json"), {}) or {}).get("rows", [])}
+    items = prev.get("items") or {}
+    todo = []
+    for it in ph.get("items", []):
+        k, rec = it["key"], items.get(it["key"])
+        if not CONFIRMED(it.get("verdict")):
+            continue
+        if rec is None or rec.get("status") in ("skipped", "add_failed", "update_failed"):
+            if rec and rec.get("status") == "skipped" and not it.get("metadata") and "no registry record" in rec.get("reason", ""):
+                continue  # still nothing confirmed to file
+            todo.append(k)
+        elif man.get(k, {}).get("kind") == "fulltext" and not rec.get("has_pdf"):
+            todo.append(k)
+    if not todo:
+        return "Zotero: up to date"
+    try:
+        out = push(rv, only=set(todo), interactive=False, quiet=True)
+    except NoAccess as e:
+        return f"Zotero: {e}"
+    except SystemExit as e:
+        return f"Zotero: not synced ({e})"
+    from collections import Counter
+    msg = f"Zotero: synced {len(todo)} reference(s): {dict(Counter(v['status'] for v in out['items'].values()))}"
+    if not quiet:
+        print(msg)
+    return msg
 
 
 # ---------------------------------------------------------------- clean the whole collection
@@ -752,23 +814,24 @@ def clean(dry_run=False):
 
 
 def undo(path):
+    """Restore every field changed by the push or clean runs recorded in this file, newest first."""
     z = read_json(path)
     if not z:
         sys.exit(f"nothing to undo: {path} not found")
     n = 0
     for k, rec in z["items"].items():
         key = rec.get("zotero_key") or k
-        if rec.get("status") != "updated":
-            continue
-        st, cur = get(f"/items/{key}")
-        if st != 200:
-            continue
-        body = {f: (c["old"] if c["old"] is not None else ([] if f in ("tags", "collections", "creators") else ""))
-                for f, c in rec["changes"].items()}
-        body["version"] = cur["data"]["version"]
-        s2, _ = write("PATCH", f"/items/{key}", body)
-        n += s2 == 204
-    print(f"restored {n} item(s). Items the push created were left in place (delete them in Zotero if unwanted).")
+        runs = rec.get("history") or ([{"changes": rec["changes"]}] if rec.get("status") == "updated" else [])
+        for h in reversed(runs):
+            st, cur = get(f"/items/{key}")
+            if st != 200:
+                break
+            body = {f: (c["old"] if c["old"] is not None else ([] if f in ("tags", "collections", "creators") else ""))
+                    for f, c in h["changes"].items()}
+            body["version"] = cur["data"]["version"]
+            s2, _ = write("PATCH", f"/items/{key}", body)
+            n += s2 == 204
+    print(f"restored {n} change set(s). Items the push created were left in place (delete them in Zotero if unwanted).")
 
 
 # ---------------------------------------------------------------- tidy (read-only)
@@ -804,7 +867,7 @@ def tidy():
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("cmd", choices=["status", "find", "push", "clean", "undo", "tidy"])
+    ap.add_argument("cmd", choices=["status", "find", "push", "sync", "clean", "undo", "tidy"])
     ap.add_argument("--doi")
     ap.add_argument("--title")
     ap.add_argument("--review")
@@ -823,6 +886,10 @@ def main():
         if not a.review:
             sys.exit("--review is required")
         push(a.review, a.dry_run, set(a.only.split(",")) if a.only else None)
+    elif a.cmd == "sync":
+        if not a.review:
+            sys.exit("--review is required")
+        print(sync(a.review, quiet=True))
     elif a.cmd == "clean":
         clean(a.dry_run)
     elif a.cmd == "undo":

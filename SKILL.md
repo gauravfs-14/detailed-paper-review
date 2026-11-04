@@ -205,7 +205,11 @@ collection (created if missing) and tagged `dpr:<review>`. Its metadata is clean
 names from ORCID or OpenAlex where they exist; citation styles can shorten full names but cannot expand
 initials. Empty fields are filled; a filled field changes only when it is substantively wrong. Missing PDFs
 are attached. References known only from the paper's own text are not filed. Every change is logged with its
-old value (`zotero.json`); `zotero_lib.py undo --review $RV` restores them. `zotero_lib.py clean` applies the
+old value (`zotero.json`); `zotero_lib.py undo --review $RV` restores them. After that first push, Zotero stays in step on its own:
+`fetch_sources.py` and `build_dashboard.py` both run `zotero_lib.py sync`, which files references that are new
+or newly confirmed (a revision, a reference the agent fixed) and attaches PDFs saved later (the user's
+downloads from `TO_DOWNLOAD.md` via `--local-pdfs`, or `--add`). It never shows Zotero's access dialog; if
+access was not granted it says so in one line. `zotero_lib.py clean` applies the
 same cleaning to everything in the collection, and `tidy` reports duplicates, missing fields and initials
 that no source could expand. Tell the user the counts from `zotero.json`.
 
