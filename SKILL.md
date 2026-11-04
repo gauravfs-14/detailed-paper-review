@@ -57,8 +57,9 @@ Preflight also reports the contact email, the OpenAlex key and Zotero. Act on it
 - **No contact email:** ask which email to send to Crossref and OpenAlex, then
   `$PY $SK/scripts/configure.py set-email <email>`.
 - **Zotero not ready:** the skill uses the Zotero desktop app as its paper library (`scripts/zotero_lib.py`).
-  Ask the user to do what preflight lists: install Zotero, open it, or turn on its local API. The skill
-  creates its "Detailed Paper Review" collection itself on first use. If they would rather not use Zotero,
+  Reading needs Zotero 7+ with the local API on; filing and cleaning papers needs Zotero 10+. Ask the user
+  to do what preflight lists (install or update Zotero, open it, turn on the local API). On the first write
+  Zotero shows an access dialog; tell the user to click "Always Allow". If they would rather not use Zotero,
   continue without it.
 
 Registry answers are cached on disk (`~/.cache/detailed-paper-review/http-cache.sqlite`, 30 days) and every
@@ -193,15 +194,19 @@ claims that depend on each; it goes into the summary.
 the references in Zotero when it is ready:
 
 ```bash
-$PY -I $SK/scripts/zotero_lib.py push --review $RV --dry-run   # what would be added or reused
+$PY -I $SK/scripts/zotero_lib.py push --review $RV --dry-run   # every planned addition and field change
 $PY -I $SK/scripts/zotero_lib.py push --review $RV
 ```
 
-Papers already in the library are reused, never duplicated or edited. New items go into the "Detailed
-Paper Review" collection with metadata from the verified registry record (or the agent's confirmed
-`metadata`), the saved PDF, and tags (`dpr:<review>`, `dpr:verified` or `dpr:needs-check`, `dpr:fulltext`).
-Unverifiable references are not added. Tell the user the counts from `zotero.json`. `zotero_lib.py tidy`
-gives a read-only report of duplicates and missing fields in that collection.
+Each confirmed reference is found in the library (or created), added to the "Detailed Paper Review"
+collection (created if missing) and tagged `dpr:<review>`. Its metadata is cleaned from the verified record
+(Crossref citation data for DOIs, or the `metadata` the ref-checker confirmed), with authors' full given
+names from ORCID or OpenAlex where they exist; citation styles can shorten full names but cannot expand
+initials. Empty fields are filled; a filled field changes only when it is substantively wrong. Missing PDFs
+are attached. References known only from the paper's own text are not filed. Every change is logged with its
+old value (`zotero.json`); `zotero_lib.py undo --review $RV` restores them. `zotero_lib.py clean` applies the
+same cleaning to everything in the collection, and `tidy` reports duplicates, missing fields and initials
+that no source could expand. Tell the user the counts from `zotero.json`.
 
 ### Phase 2: fact check (strict)
 

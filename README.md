@@ -55,18 +55,22 @@ never in a file:
 
 The agent will not create the account for you. Check your settings at any time with `configure.py status`.
 
-**Zotero as the paper library.** With the Zotero desktop app (version 7 or later) open, and its local API
-turned on (Zotero Settings > Advanced > "Allow other applications on this computer to communicate with
-Zotero"), the skill:
+**Zotero as the paper library.** Use Zotero 10 or later, open, with its local API turned on (Zotero Settings >
+Advanced > "Allow other applications on this computer to communicate with Zotero"). No zotero.org account or
+API key is needed. The first time the skill writes, Zotero asks for access; click "Always Allow". The skill:
 
 - looks in your library before downloading a paper, and reuses the PDF you already have;
-- files each review's verified references in a "Detailed Paper Review" collection, which it creates itself
-  the first time;
-- never duplicates or edits papers you already have, and never touches other collections;
-- fills metadata from the verified registry record, attaches the saved PDF, sets the citation key, and adds
-  the tags `dpr:<review>`, `dpr:verified` or `dpr:needs-check`, and `dpr:fulltext`.
+- files each review's verified references in a "Detailed Paper Review" collection, which it creates itself,
+  reusing papers you already have instead of duplicating them;
+- cleans their metadata from the verified record: Crossref citation data (full date, journal abbreviation,
+  ISSN, language, abstract) or the details an agent confirmed on the source page, with authors' full given
+  names from ORCID or OpenAlex wherever they exist, so your citation style decides how names appear;
+- fills empty fields, corrects only substantive errors (not case or punctuation), attaches missing PDFs,
+  sets the citation key, and tags each paper `dpr:<review>`;
+- logs every change with its old value, so `zotero_lib.py undo` restores it.
 
-No Zotero API key is needed: it works through the desktop app, like the browser connector.
+`zotero_lib.py clean` cleans everything in the collection, and `zotero_lib.py tidy` reports duplicates,
+missing fields and initials that no source could expand. Zotero 7 to 9 can be read but not edited.
 
 ### Requests and caching
 

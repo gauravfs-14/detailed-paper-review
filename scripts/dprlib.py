@@ -153,7 +153,7 @@ def _with_credentials(url, headers):
 # Registry answers are cached on disk so a reference is not looked up again on every run. Only metadata APIs
 # are cached (never PDFs or web pages), only 200 and 404 answers, keyed by the URL without credentials.
 CACHE_HOSTS = {"api.crossref.org", "api.openalex.org", "api.semanticscholar.org", "api.datacite.org",
-               "export.arxiv.org", "www.ebi.ac.uk"}
+               "export.arxiv.org", "www.ebi.ac.uk", "pub.orcid.org"}
 CACHE_TTL = {200: float(os.environ.get("DPR_CACHE_DAYS", "30")) * 86400, 404: 7 * 86400}
 CACHE_STATS = {"hits": 0, "misses": 0}
 OPENALEX_BUDGET = {}

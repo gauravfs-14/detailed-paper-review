@@ -47,7 +47,8 @@ Zotero library. Shape:
 "title": "...", "authors": [{"family": "...", "given": "..."} or {"name": "Organization Name"}], "date": "YYYY[-MM[-DD]]",
 "container": "journal, proceedings, book or website title", "publisher": "...", "institution": "issuing body",
 "number": "report or standard number", "volume": "...", "issue": "...", "pages": "...", "doi": "...", "url": "...",
-"source_url": "page where you confirmed it"}`. Leave out fields you could not confirm; never fill one from memory.
+"source_url": "page where you confirmed it"}`. Give authors' full given names when the source shows them
+(the citation style abbreviates them later). Leave out fields you could not confirm; never fill one from memory.
 
 Write `$RV/work/refs/<group>.json`:
 
