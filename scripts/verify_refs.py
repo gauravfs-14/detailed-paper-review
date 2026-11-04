@@ -20,7 +20,7 @@ import sys
 import urllib.parse
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from dprlib import (bib_authors, clean_doi, family_key, get_json, http_get, norm, now_iso, parse_reference_text, read_json,  # noqa: E402
+from dprlib import (bib_authors, clean_doi, family_key, get_json, http_get, norm, now_iso, require_network, parse_reference_text, read_json,  # noqa: E402
                     token_set_ratio, write_json)
 
 CROSSREF = "https://api.crossref.org/works"
@@ -323,7 +323,10 @@ def check_one(r, review):
             else:
                 st3, _ = http_get(f"https://doi.org/{c['doi']}", accept="text/html", retries=1)
                 log(f"doi.org resolve -> HTTP {st3}")
-                if st3 not in (200, 301, 302, 303):
+                if st3 == 0:
+                    FAILED["doi.org"] = 0
+                    out["lookup_failed"] = sorted(set(out.get("lookup_failed", []) + ["doi.org"]))
+                elif st3 not in (200, 301, 302, 303):
                     out["issues"].append({"field": "doi", "severity": "critical", "note": "DOI does not resolve (wrong DOI).",
                                           "cited": c["doi"], "found": None})
         if xr:
@@ -415,6 +418,7 @@ def main():
     ap.add_argument("--only", help="comma-separated keys")
     ap.add_argument("--workers", type=int, default=4)
     a = ap.parse_args()
+    require_network()
     ms = read_json(os.path.join(a.review, "manuscript", "manuscript.json"))
     refs = ms["references"]
     if a.only:

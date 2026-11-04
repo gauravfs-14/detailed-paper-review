@@ -1,6 +1,7 @@
 """Shared helpers for the detailed-paper-review scripts (stdlib only)."""
 import json
 import os
+import sys
 import re
 import time
 import unicodedata
@@ -74,6 +75,30 @@ def http_get(url, accept="application/json", timeout=30, retries=3, binary=False
             last = e
             time.sleep(1.5 * (attempt + 1))
     return 0, (b"" if binary else f"ERROR: {last}")
+
+
+NETWORK_HELP = """Network access is blocked, so registry lookups and downloads cannot run.
+This is usually the agent's sandbox, not the internet. Fix it, then rerun this command:
+  - Codex: approve running this command outside the sandbox when asked, or start Codex with network
+    allowed in the workspace sandbox: `codex -s workspace-write -c sandbox_workspace_write.network_access=true`
+  - Claude Code: allow the command (or network access) when the permission prompt appears.
+  - Elsewhere: run the command in a normal terminal.
+Nothing has been checked yet. Do NOT report any reference as verified or missing."""
+
+
+def network_ok(hosts=("https://api.crossref.org/", "https://api.openalex.org/")):
+    """True if at least one registry answers. Used to stop early instead of writing misleading results."""
+    for h in hosts:
+        st, _ = http_get(h, accept="*/*", timeout=10, retries=1)
+        if st:
+            return True
+    return False
+
+
+def require_network(hosts=("https://api.crossref.org/", "https://api.openalex.org/")):
+    if not network_ok(hosts):
+        print(NETWORK_HELP, file=sys.stderr)
+        sys.exit(3)
 
 
 def get_json(url, **kw):

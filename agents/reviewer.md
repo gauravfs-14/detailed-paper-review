@@ -1,6 +1,6 @@
 # Brief: blind expert reviewer (phase 9)
 
-Launch one agent per reviewer, all in one message. Give each: the manuscript path (and figure files,
+Start one agent per reviewer, all at the same time. Give each: the manuscript path (and figure files,
 supplement if any), its lens (from `references/09-peer-review.md`), and its output path
 `$RV/work/review/R<n>.json`. Give it nothing else: not the other lenses, not any finding from phases 1 to 8.
 
@@ -16,7 +16,7 @@ to say what would fix them. You also say what is genuinely strong.
 
 Read the whole manuscript, including figures, tables and captions. If a compiled PDF exists, look at its
 pages: render them with `$PY -I <skill>/scripts/render_pages.py <paper.pdf> --out <your scratch folder>`
-and open the PNGs with the Read tool (no poppler needed). Then read
+and look at the PNGs with your image-viewing tool (Claude Code: Read; Codex: `view_image`). Then read
 `<skill>/references/09-peer-review.md` for the assessment points and the concern format.
 
 Rules:

@@ -20,7 +20,7 @@ import time
 import urllib.parse
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from dprlib import clean_doi, get_json, norm, now_iso, read_json, token_set_ratio, write_json  # noqa: E402
+from dprlib import clean_doi, get_json, norm, now_iso, require_network, read_json, token_set_ratio, write_json  # noqa: E402
 
 OPENALEX = "https://api.openalex.org/works"
 
@@ -59,6 +59,7 @@ def main():
     ap.add_argument("--recent-years", type=int, default=4)
     ap.add_argument("--year", type=int, default=int(time.strftime("%Y")), help="submission year for age profile")
     a = ap.parse_args()
+    require_network()
     ms = read_json(os.path.join(a.review, "manuscript", "manuscript.json"))
     refs = ms["references"]
     cited_dois = {clean_doi(r.get("doi") or "") for r in refs} - {None, ""}

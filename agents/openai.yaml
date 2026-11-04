@@ -1,0 +1,6 @@
+interface:
+  display_name: "Detailed Paper Review"
+  short_description: "Audit a manuscript: references, fact check, stats, figures, peer review, dashboard"
+  default_prompt: "Review this paper with $detailed-paper-review"
+policy:
+  allow_implicit_invocation: true

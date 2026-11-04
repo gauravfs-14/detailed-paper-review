@@ -39,7 +39,30 @@ Three rules matter more than anything else, for you and for every agent you star
 ```bash
 SK=<this skill's directory>
 eval "$(bash $SK/scripts/setup_env.sh)"        # sets $PY (private venv with PyMuPDF, python-docx)
+$PY -I $SK/scripts/preflight.py                 # network, packages, write access, report tools
 ```
+
+Do not start until preflight prints `READY`. If it prints `NOT READY`, follow its instructions (usually the
+agent's sandbox is blocking the network) and rerun it. Never run the reference or literature phases offline:
+the scripts stop on purpose rather than record lookups that never happened.
+
+### Running under different agents
+
+This skill works in Claude Code, Codex and other agents that read `SKILL.md`. The workflow is identical;
+only the names of a few host tools differ.
+
+| Need | Claude Code | Codex | No such tool |
+|---|---|---|---|
+| Start a subagent with a brief | Agent tool | spawn a subagent (`spawn_agent`), then wait for it (`wait_agent`) | do the brief yourself, one batch at a time (see below) |
+| Look at a PNG (figures, rendered pages) | Read tool on the file | `view_image` | report figures as "not inspected" |
+| Web search / open a page | WebSearch, WebFetch | web search tool, or `curl` from the shell | `curl` from the shell |
+| Network for scripts | approve the permission prompt | approve running the command outside the sandbox, or start Codex with `-s workspace-write -c sandbox_workspace_write.network_access=true` | normal terminal |
+
+Subagents: start them in parallel up to the host's limit (Codex caps concurrent subagents with
+`agents.max_concurrent_threads_per_session`; launch the rest as earlier ones finish) and wait for all of them
+before merging. Every brief starts with `agents/_evidence-rules.md`, whatever the host.
+If the host cannot start subagents, run each brief yourself in turn, with the same inputs and the same output
+file, and do not shorten it: the coverage checks are the same, so a skipped batch shows as "not finished".
 
 Run Python scripts as `$PY -I $SK/scripts/<script>.py ...` (`-I` keeps downloaded files from being imported
 as code). All output goes to `paper-review/<paper-name>/` in the current working directory (`$RV`). The
@@ -93,7 +116,7 @@ coverage. For PDF input, confirm the section list and reference count against th
 ## The phases
 
 Phases 1 and 2 come first: everything later assumes the citations are real and the cited claims are true.
-The other phases can run in parallel after that (independent agents, all launched in one message). After
+The other phases can run in parallel after that (independent agents, started together). After
 **every** phase run `build_dashboard.py`, so the dashboard always shows the current truth.
 
 | # | Phase | Rulebook (read before starting it) | Agent brief |

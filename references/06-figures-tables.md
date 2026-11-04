@@ -1,7 +1,7 @@
 # Phase 6: figures and tables
 
 Goal: every figure is readable at print size and honest about the data; every table is logically grouped,
-complete, and ready to typeset. Look at each figure image (Read tool on the PNG; for PDF figures or the compiled
+complete, and ready to typeset. Look at each figure image (your image-viewing tool on the PNG, e.g. Read in Claude Code or `view_image` in Codex; for PDF figures or the compiled
 paper use `scripts/render_pages.py`, e.g. `--dpi 300` to see a figure at print resolution). Judge at the size it will be printed: a single column is about 89 mm wide
 and a double column about 183 mm, so a figure image 2,000 px wide shown in one column is shrunk about five
 times. Text that is fine on screen can be 3 pt on paper.

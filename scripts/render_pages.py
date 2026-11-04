@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Render PDF pages (or a PDF figure) to PNG so agents can look at them with the Read tool.
+"""Render PDF pages (or a PDF figure) to PNG so agents can look at them with their image-viewing tool.
 
   python render_pages.py paper.pdf --out $RV/work/pages [--pages 1-3,7] [--dpi 110]
   python render_pages.py figure.pdf --out $RV/work/figs --dpi 300      # judge a figure at print size

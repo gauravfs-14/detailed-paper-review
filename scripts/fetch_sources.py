@@ -31,7 +31,7 @@ import sys
 import urllib.parse
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from dprlib import clean_doi, get_json, http_get, norm, now_iso, parse_reference_text, read_json, token_set_ratio, write_json  # noqa: E402
+from dprlib import clean_doi, get_json, http_get, norm, now_iso, require_network, parse_reference_text, read_json, token_set_ratio, write_json  # noqa: E402
 
 MIN_PDF_BYTES = 8000
 
@@ -269,6 +269,7 @@ def main():
     ap.add_argument("--workers", type=int, default=4)
     ap.add_argument("--add", action="append", default=[], help="key=url of a legal copy found by hand")
     a = ap.parse_args()
+    require_network()
     extra = {}
     for kv in a.add:
         k, _, u = kv.partition("=")

@@ -1,6 +1,6 @@
 # detailed-paper-review
 
-An agent skill for Claude Code that audits a scientific manuscript before submission or for a revision.
+An agent skill for Claude Code and Codex that audits a scientific manuscript before submission or for a revision.
 
 It does the following:
 - checks every reference against Crossref, OpenAlex, DataCite and publisher records, and downloads the cited papers;
@@ -16,30 +16,50 @@ See [SKILL.md](SKILL.md) for the full workflow.
 
 ## Install
 
-Install it globally (user level, in `~/.claude/skills/`) so it is available in every project, not just one.
+Install it globally, so it is available in every project. One copy serves both agents: Codex reads skills
+from `~/.agents/skills/`, and a symlink makes the same copy visible to Claude Code in `~/.claude/skills/`.
 
-**Quickest way:** paste this one line into Claude Code:
+**Quickest way:** paste this one line into Claude Code or Codex:
 
 ```text
-Install the skill from https://github.com/gauravfs-14/detailed-paper-review globally: clone it into ~/.claude/skills/detailed-paper-review and run its scripts/setup_env.sh
+Install the skill from https://github.com/gauravfs-14/detailed-paper-review globally: clone it into ~/.agents/skills/detailed-paper-review, symlink it to ~/.claude/skills/detailed-paper-review, and run its scripts/setup_env.sh
 ```
 
 **Or run this in a terminal:**
 
 ```bash
-git clone https://github.com/gauravfs-14/detailed-paper-review ~/.claude/skills/detailed-paper-review && bash ~/.claude/skills/detailed-paper-review/scripts/setup_env.sh
+mkdir -p ~/.agents/skills ~/.claude/skills && git clone https://github.com/gauravfs-14/detailed-paper-review ~/.agents/skills/detailed-paper-review && ln -sfn ~/.agents/skills/detailed-paper-review ~/.claude/skills/detailed-paper-review && bash ~/.agents/skills/detailed-paper-review/scripts/setup_env.sh
 ```
 
-`setup_env.sh` creates a private Python environment at `~/.cache/detailed-paper-review/venv` with PyMuPDF and python-docx. PDF reports also need `pandoc` and `xelatex`.
+`setup_env.sh` creates a private Python environment at `~/.cache/detailed-paper-review/venv` with PyMuPDF
+and python-docx. It needs network access the first time. PDF reports also need `pandoc` and `xelatex`.
 
 Optional: set `OPENALEX_API_KEY` or `OPENALEX_MAILTO` for faster, more reliable OpenAlex lookups.
 
-Then ask Claude Code something like "review this paper" or "check the references in main.tex".
+## Use
+
+Ask something like "review this paper" or "check the references in main.tex". In Codex you can also call it
+by name with `$detailed-paper-review`.
+
+The review needs network access for reference lookups and downloads. Before starting, the skill runs
+`scripts/preflight.py`. If the agent's sandbox blocks the network, preflight stops the review and says how to
+fix it, so no reference is ever reported as checked when it was not.
+
+- **Claude Code:** approve the commands when the permission prompt appears.
+- **Codex:** the default workspace sandbox blocks the network. Start Codex with network allowed in the sandbox:
+
+  ```bash
+  codex -s workspace-write -c sandbox_workspace_write.network_access=true
+  ```
+
+  Or approve each command when Codex asks to run it outside the sandbox. Subagents, which the fact check and
+  peer review use, are on by default in current Codex releases.
 
 ## Token usage
 
 A full review is expensive, because every reference and every cited sentence is checked by a subagent.
-The figures below are subagent tokens as reported by Claude Code in test runs on real papers. They
+The figures below are subagent tokens as reported by Claude Code in test runs on real papers (Codex usage
+has not been measured yet). They
 leave out the main agent's own orchestration tokens, which add more on top.
 
 | Work | Measured cost |
