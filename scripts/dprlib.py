@@ -212,6 +212,47 @@ def network_summary():
     return "; ".join(parts)
 
 
+# ---------------------------------------------------------------- Zotero write lock
+class zotero_lock:
+    """Held while looking a paper up in Zotero and creating it, so two programs filing the same paper at once
+    (this skill in a terminal, another copy of it, or an app such as Lexiq Writer) cannot both create it.
+    A directory in the shared cache folder, since mkdir is atomic everywhere; a lock older than `stale`
+    seconds is from a crashed run and is taken over."""
+
+    def __init__(self, wait=60.0, stale=120.0):
+        self.path = os.path.join(CACHE_DIR, "zotero-write.lock")
+        self.wait, self.stale, self.held = wait, stale, False
+
+    def __enter__(self):
+        os.makedirs(CACHE_DIR, exist_ok=True)
+        deadline = time.monotonic() + self.wait
+        while True:
+            try:
+                os.mkdir(self.path)
+                self.held = True
+                return self
+            except FileExistsError:
+                try:
+                    if time.time() - os.path.getmtime(self.path) > self.stale:
+                        os.rmdir(self.path)
+                        continue
+                except OSError:
+                    continue
+                if time.monotonic() > deadline:
+                    return self  # never block a review on a stuck lock; the DOI/title check still runs
+                time.sleep(0.2)
+            except OSError:
+                return self  # read-only cache folder: work without the lock
+
+    def __exit__(self, *exc):
+        if self.held:
+            try:
+                os.rmdir(self.path)
+            except OSError:
+                pass
+        return False
+
+
 # ---------------------------------------------------------------- JSON io
 def read_json(path, default=None):
     if not os.path.exists(path):

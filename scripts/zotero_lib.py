@@ -20,6 +20,14 @@ Every change is logged with the old value (RV/zotero.json or the clean log, and
 ~/.cache/detailed-paper-review/zotero-changes.jsonl), so `undo` restores it. References known only from the
 paper's own reference text are never filed.
 
+Settings for apps that run the skill (environment; see PIPELINE.md). Without them nothing changes:
+  DPR_ZOTERO_COLLECTION      collection name (else config.json "zotero_collection", else "Detailed Paper Review")
+  DPR_ZOTERO_EXISTING=link   papers already in the library are only linked: no collection, tag or field change
+  DPR_ZOTERO_KEYCHAIN=0      use ZOTERO_LOCAL_API_KEY only; never read or store a key in the keychain
+  DPR_ZOTERO=on|off          the app decided: off never writes (push, sync); on syncs even if setup skipped Zotero
+Looking a paper up and creating it happens under a lock (zotero-write.lock in the cache folder), so two
+programs filing at the same time cannot create the same paper twice.
+
 Commands:
   status                                    Zotero version, local API, write access, collection
   find --doi D | --title T                  look up a paper (item key and PDF path)
@@ -45,9 +53,9 @@ import urllib.request
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from dprlib import (CACHE_DIR, KEYCHAIN_SERVICE, clean_doi, get_json, http_get, load_config, norm,  # noqa: E402
-                    read_json, token_set_ratio, write_json)
+                    read_json, token_set_ratio, write_json, zotero_lock)
 
-BASE = "http://localhost:23119"
+BASE = (os.environ.get("DPR_ZOTERO_URL") or "http://localhost:23119").rstrip("/")  # override for tests
 API = BASE + "/api/users/0"
 APP_NAME = "Detailed Paper Review"
 KEY_ACCOUNT = "zotero-local"
@@ -59,7 +67,27 @@ class NoAccess(Exception):
 
 
 def collection_name():
-    return load_config().get("zotero_collection") or "Detailed Paper Review"
+    return (os.environ.get("DPR_ZOTERO_COLLECTION") or "").strip() or load_config().get("zotero_collection") \
+        or "Detailed Paper Review"
+
+
+def existing_mode():
+    """What a push does with a paper the library already has. "update" (the default): file it in the collection,
+    tag it and clean its metadata. "link": only record which item it is; the item is not changed at all."""
+    return "link" if os.environ.get("DPR_ZOTERO_EXISTING", "").strip().lower() == "link" else "update"
+
+
+def host_setting():
+    """DPR_ZOTERO=on|off: an app running the skill (Lexiq Writer) decided whether this review files papers in Zotero.
+    "off": push and sync never write. "on": sync runs even if this copy's own setup skipped Zotero. Unset: as usual."""
+    v = os.environ.get("DPR_ZOTERO", "").strip().lower()
+    return v if v in ("on", "off") else None
+
+
+def use_keychain():
+    """DPR_ZOTERO_KEYCHAIN=0: neither read nor store the Zotero key in the keychain (the caller passes
+    ZOTERO_LOCAL_API_KEY instead), so a host app never uses or replaces the key of a separately installed copy."""
+    return os.environ.get("DPR_ZOTERO_KEYCHAIN", "1").strip() not in ("0", "false", "no")
 
 
 # ---------------------------------------------------------------- transport
@@ -97,6 +125,8 @@ def get(path):
 
 
 def _keychain_get():
+    if not use_keychain():
+        return None
     try:
         if sys.platform == "darwin":
             r = subprocess.run(["security", "find-generic-password", "-s", KEYCHAIN_SERVICE, "-a", KEY_ACCOUNT, "-w"],
@@ -113,6 +143,8 @@ def _keychain_get():
 
 def _keychain_put(key):
     """Store without putting the key on a command line (it would show in the process list)."""
+    if not use_keychain():
+        return
     try:
         if sys.platform == "darwin":
             cmd = f'add-generic-password -U -s "{KEYCHAIN_SERVICE}" -a "{KEY_ACCOUNT}" -w "{key}"\n'
@@ -150,6 +182,8 @@ def write(method, path, body=None, headers=None, form=False):
         if not _STATE["key"]:
             if not _STATE["interactive"]:
                 raise NoAccess("Zotero write access not granted yet; run `zotero_lib.py push --review RV` once")
+            if not use_keychain():
+                sys.exit("Zotero refused the key this program was given (ZOTERO_LOCAL_API_KEY). Nothing was changed.")
             _authorize()
         hdrs = {"Zotero-Server-ID": _STATE["server_id"] or "", "Zotero-API-Key": _STATE["key"]}
         if form:
@@ -623,10 +657,11 @@ def _log_change(entry):
 
 # ---------------------------------------------------------------- push
 def ensure_collection():
-    c = find_collection()
-    if c:
-        return c["key"]
-    st, js = write("POST", "/collections", [{"name": collection_name()}])
+    with zotero_lock():
+        c = find_collection()
+        if c:
+            return c["key"]
+        st, js = write("POST", "/collections", [{"name": collection_name()}])
     if st == 200 and isinstance(js, dict) and js.get("successful"):
         return list(js["successful"].values())[0]["key"]
     sys.exit(f"Could not create the '{collection_name()}' collection (HTTP {st}: {str(js)[:200]}).")
@@ -641,6 +676,8 @@ def _ready(dry_run):
 
 
 def push(rv, dry_run=False, only=None, interactive=True, quiet=False):
+    if host_setting() == "off":
+        sys.exit("Zotero is off for this review (DPR_ZOTERO=off).")
     _STATE["interactive"] = interactive
     st = _ready(dry_run)
     ph = read_json(os.path.join(rv, "phases", "01-references.json"))
@@ -651,7 +688,9 @@ def push(rv, dry_run=False, only=None, interactive=True, quiet=False):
     prev = read_json(os.path.join(rv, "zotero.json"), {}) or {}
     col = (st["collection"] or "(created on the real run)") if dry_run else ensure_collection()
     run = datetime.datetime.now().isoformat(timespec="seconds")
-    out = {"collection": collection_name(), "collection_key": col, "run": run, "dry_run": dry_run, "items": {}}
+    link_only = existing_mode() == "link"
+    out = {"collection": collection_name(), "collection_key": col, "run": run, "dry_run": dry_run,
+           "existing": existing_mode(), "items": {}}
     for it in ph.get("items", []):
         key, verdict = it["key"], it.get("verdict")
         if only and key not in only:
@@ -673,36 +712,19 @@ def push(rv, dry_run=False, only=None, interactive=True, quiet=False):
             if s0 == 200 and not cur["data"].get("deleted"):
                 att, path = pdf_attachment(prev_key)
                 hit = {"key": prev_key, "data": cur["data"], "match": "earlier push", "pdf": path, "pdf_attachment": att}
-        hit = hit or find(new_item.get("DOI"), new_item.get("title"), (new_item.get("date") or "")[:4] or None)
-        rec = {"metadata_from": origin, "full_names": notes}
-        if hit:
-            ch = plan_changes(hit["data"], new_item, key, review_tag, None if dry_run and not st["collection"] else col)
-            rec.update(status="existing", zotero_key=hit["key"], match=hit["match"],
-                       changes={f: {"old": o, "new": n} for f, (o, n) in ch.items()})
-            if not dry_run and ch:
-                err = apply_changes(hit["key"], hit["data"]["version"], ch, run, rv)
-                rec["status"] = "updated" if not err else "update_failed"
-                if err:
-                    rec["error"] = err
+        with zotero_lock():  # no other program can file the same paper between this lookup and the create
+            hit = hit or find(new_item.get("DOI"), new_item.get("title"), (new_item.get("date") or "")[:4] or None)
+            rec = _file_one(hit, new_item, key, review_tag, st, col, dry_run, link_only, origin, notes, run, rv)
+        if hit and not link_only:  # attach the saved PDF when the item has none (outside the lock: uploads are slow)
             if pdf and not hit["pdf_attachment"]:
                 rec["pdf"] = "would attach" if dry_run else (upload_pdf(hit["key"], pdf)[1] or "attached")
             rec["has_pdf"] = bool(hit["pdf_attachment"]) or rec.get("pdf") == "attached"
-        else:
-            new_item["tags"] = [{"tag": review_tag}]
-            if dry_run:
-                rec.update(status="to_add", item=new_item, pdf="would attach" if pdf else None)
-            else:
-                new_item["collections"] = [col]
-                s2, r2 = write("POST", "/items", [new_item])
-                if s2 == 200 and isinstance(r2, dict) and r2.get("successful"):
-                    zk = list(r2["successful"].values())[0]["key"]
-                    rec.update(status="added", zotero_key=zk)
-                    _log_change({"run": run, "source": rv, "item": zk, "created": True})
-                    if pdf:
-                        rec["pdf"] = upload_pdf(zk, pdf)[1] or "attached"
-                    rec["has_pdf"] = rec.get("pdf") == "attached"
-                else:
-                    rec.update(status="add_failed", error=f"HTTP {s2}: {str(r2)[:300]}")
+        elif not hit and dry_run:
+            rec["pdf"] = "would attach" if pdf else None
+        elif not hit and rec["status"] == "added":
+            if pdf:
+                rec["pdf"] = upload_pdf(rec["zotero_key"], pdf)[1] or "attached"
+            rec["has_pdf"] = rec.get("pdf") == "attached"
         if rec.get("zotero_key"):
             rec["select"] = f"zotero://select/library/items/{rec['zotero_key']}"
         old = (prev.get("items") or {}).get(key) or {}
@@ -729,10 +751,12 @@ def sync(rv, quiet=False):
     """Incremental push, safe to run any time (after downloads, after every dashboard build): files references
     that are new or newly confirmed, and attaches PDFs saved since the last push. Runs only after the review's
     first push, never shows Zotero's access dialog, and returns a one-line status."""
+    if host_setting() == "off":
+        return "Zotero: off for this review"
     prev = read_json(os.path.join(rv, "zotero.json"))
     if not prev:
         return "Zotero: not filed yet (the first push happens at the end of phase 1)"
-    if "zotero" in set(load_config().get("skipped_setup", [])):
+    if host_setting() != "on" and "zotero" in set(load_config().get("skipped_setup", [])):
         return "Zotero: skipped by the user"
     st = status(quiet=True)
     if not st["writable"]:
@@ -749,7 +773,7 @@ def sync(rv, quiet=False):
             if rec and rec.get("status") == "skipped" and not it.get("metadata") and "no registry record" in rec.get("reason", ""):
                 continue  # still nothing confirmed to file
             todo.append(k)
-        elif man.get(k, {}).get("kind") == "fulltext" and not rec.get("has_pdf"):
+        elif rec.get("status") != "linked" and man.get(k, {}).get("kind") == "fulltext" and not rec.get("has_pdf"):
             todo.append(k)
     if not todo:
         return "Zotero: up to date"
@@ -764,6 +788,36 @@ def sync(rv, quiet=False):
     if not quiet:
         print(msg)
     return msg
+
+
+def _file_one(hit, new_item, key, review_tag, st, col, dry_run, link_only, origin, notes, run, rv):
+    """File one confirmed reference: link or update the item the library has, or create it (no PDF here)."""
+    rec = {"metadata_from": origin, "full_names": notes}
+    if hit and link_only:
+        rec.update(status="linked", zotero_key=hit["key"], match=hit["match"])
+    elif hit:
+        ch = plan_changes(hit["data"], new_item, key, review_tag, None if dry_run and not st["collection"] else col)
+        rec.update(status="existing", zotero_key=hit["key"], match=hit["match"],
+                   changes={f: {"old": o, "new": n} for f, (o, n) in ch.items()})
+        if not dry_run and ch:
+            err = apply_changes(hit["key"], hit["data"]["version"], ch, run, rv)
+            rec["status"] = "updated" if not err else "update_failed"
+            if err:
+                rec["error"] = err
+    else:
+        new_item["tags"] = [{"tag": review_tag}]
+        if dry_run:
+            rec.update(status="to_add", item=new_item)
+        else:
+            new_item["collections"] = [col]
+            s2, r2 = write("POST", "/items", [new_item])
+            if s2 == 200 and isinstance(r2, dict) and r2.get("successful"):
+                zk = list(r2["successful"].values())[0]["key"]
+                rec.update(status="added", zotero_key=zk)
+                _log_change({"run": run, "source": rv, "item": zk, "created": True})
+            else:
+                rec.update(status="add_failed", error=f"HTTP {s2}: {str(r2)[:300]}")
+    return rec
 
 
 # ---------------------------------------------------------------- clean the whole collection

@@ -146,3 +146,16 @@ reduce it, run only the phases you need (for example, references only).
 | `assets/dashboard/` | Offline dashboard template with bundled fonts and icons (licences in `vendor/LICENSES.txt`) |
 
 See [NOTICE.md](NOTICE.md) for attribution.
+
+## Using the skill from an app
+
+`pipeline.json` describes the review as a list of steps (scripts to run and briefs to give a model), so an
+app can run it with any model. [PIPELINE.md](PIPELINE.md) explains the format and the settings an app can
+pass. Lexiq Writer ships a copy of this skill and updates it from this repo's releases. It keeps its own
+Zotero key and collection, so it never conflicts with a copy you installed yourself.
+
+Releases: set `version` in `skill.json`, then push a matching tag (`git tag v0.2.0 && git push --tags`). The
+release workflow runs the tests and publishes `detailed-paper-review-<version>.zip` with its checksum.
+
+Tests: `python -m unittest discover -s tests` (no network needed; Zotero is simulated).
+
