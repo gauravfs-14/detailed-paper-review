@@ -74,15 +74,26 @@ def main():
     if res["write"] is not True:
         problems.append(f"Cannot write to {a.out}: {res['write']}")
     notes = []
+    # first-run setup: questions for the intake message (only what is missing and not skipped by the user)
+    from dprlib import load_config
+    skipped = set(load_config().get("skipped_setup", []))
+    setup = []
     if not res["contact_email"]:
-        notes.append("No contact email: Crossref and OpenAlex use their slower public limits. "
-                     "Run: $PY <skill>/scripts/configure.py set-email you@example.org")
-    if not res["openalex_key"]:
-        notes.append("No OpenAlex API key (optional, 3x faster and 10x the daily budget). The user creates a free "
-                     "account at https://openalex.org/signup (agents must not sign up for them), then runs "
-                     "`$PY <skill>/scripts/configure.py openalex-key` in their own terminal.")
-    if not res["zotero"].get("ready"):
-        notes.append("Zotero library not used: " + " ".join(res["zotero"].get("todo", [])))
+        setup.append({"id": "email", "ask": "Which email should be sent to Crossref and OpenAlex as the contact? "
+                      "(faster, more reliable lookups)", "then": "$PY <skill>/scripts/configure.py set-email <email>"})
+    if not res["openalex_key"] and "openalex-key" not in skipped:
+        setup.append({"id": "openalex-key", "ask": "Optional: add a free OpenAlex API key (about 3x faster, 10x the daily "
+                      "budget)? Sign up at https://openalex.org/signup, copy the key from "
+                      "https://openalex.org/settings/api-key, then run the command below in your own terminal. "
+                      "Or say 'skip' and it won't be offered again.",
+                      "then": "user runs: $PY <skill>/scripts/configure.py openalex-key ; "
+                              "if they say skip: $PY <skill>/scripts/configure.py skip openalex-key"})
+    zs = res["zotero"]
+    if not zs.get("ready") and "zotero" not in skipped:
+        setup.append({"id": "zotero", "ask": "Use Zotero as the paper library (reuses PDFs you have, files and cleans "
+                      "the references)? To do so: " + " ".join(zs.get("todo", [])) + " Or say 'skip'.",
+                      "then": "rerun preflight; if they say skip: $PY <skill>/scripts/configure.py skip zotero"})
+    res["first_run_setup"] = setup
     if not (res["tools"]["pandoc"] and res["tools"]["xelatex"]):
         notes.append("pandoc or xelatex missing: the dashboard works, but the PDF report will not be built.")
     if not (res["tools"]["latexmk"] or res["tools"]["pdflatex"]):

@@ -36,7 +36,9 @@ and python-docx. It needs network access the first time. PDF reports also need `
 
 ### Recommended setup
 
-These are optional, but they make reviews faster and avoid repeated downloads.
+These are optional, but they make reviews faster and avoid repeated downloads. On the first run the skill
+asks about them in the same message as its review questions, so you can also just start a review. Say
+"skip" to any of them and it won't be offered again (`configure.py unskip openalex-key|zotero` brings it back).
 
 **Contact email.** Crossref and OpenAlex give faster limits to requests that include one:
 

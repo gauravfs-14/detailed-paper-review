@@ -6,6 +6,8 @@
   openalex-key               save an OpenAlex API key in the system keychain (asks for it; run in your own terminal)
   semanticscholar-key        same for a Semantic Scholar API key (optional)
   forget KEYNAME             remove a saved key (openalex | semanticscholar)
+  skip ITEM                  stop offering an optional setup item: openalex-key | zotero
+  unskip ITEM                offer it again
   clear-cache                delete cached registry answers
 
 API keys are stored in the macOS Keychain (or the Linux secret service) under the service name
@@ -26,6 +28,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import dprlib  # noqa: E402
 
 KEYNAMES = ("openalex", "semanticscholar")
+SKIPPABLE = ("openalex-key", "zotero")
 
 
 def save_config(**kw):
@@ -62,7 +65,8 @@ def forget(name):
 
 
 def status():
-    out = {"contact_email": dprlib.contact_email(), "config_file": os.path.join(dprlib.CONFIG_DIR, "config.json")}
+    out = {"contact_email": dprlib.contact_email(), "config_file": os.path.join(dprlib.CONFIG_DIR, "config.json"),
+           "skipped_setup": dprlib.load_config().get("skipped_setup", [])}
     for name in KEYNAMES:
         out[f"{name}_key"] = "set" if dprlib.secret(name) else "not set"
     if dprlib.secret("openalex"):
@@ -85,7 +89,8 @@ def status():
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("cmd", choices=["status", "set-email", "openalex-key", "semanticscholar-key", "forget", "clear-cache"])
+    ap.add_argument("cmd", choices=["status", "set-email", "openalex-key", "semanticscholar-key", "forget", "clear-cache",
+                                    "skip", "unskip"])
     ap.add_argument("value", nargs="?")
     a = ap.parse_args()
     if a.cmd == "status":
@@ -94,7 +99,15 @@ def main():
         if not a.value or "@" not in a.value:
             sys.exit("usage: configure.py set-email you@example.org")
         save_config(mailto=a.value.strip())
+    elif a.cmd in ("skip", "unskip"):
+        if a.value not in SKIPPABLE:
+            sys.exit("usage: configure.py skip|unskip " + "|".join(SKIPPABLE))
+        skipped = set(dprlib.load_config().get("skipped_setup", []))
+        skipped = skipped | {a.value} if a.cmd == "skip" else skipped - {a.value}
+        save_config(skipped_setup=sorted(skipped))
     elif a.cmd in ("openalex-key", "semanticscholar-key"):
+        if a.cmd == "openalex-key" and "openalex-key" in dprlib.load_config().get("skipped_setup", []):
+            save_config(skipped_setup=sorted(set(dprlib.load_config()["skipped_setup"]) - {"openalex-key"}))
         store_key(a.cmd.split("-")[0])
     elif a.cmd == "forget":
         if a.value not in KEYNAMES:

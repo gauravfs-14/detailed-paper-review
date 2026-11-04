@@ -47,20 +47,20 @@ eval "$(bash $SK/scripts/setup_env.sh)"        # sets $PY (private venv with PyM
 $PY -I $SK/scripts/preflight.py                 # network, packages, write access, report tools
 ```
 
-Preflight also reports the contact email, the OpenAlex key and Zotero. Act on its notes before starting:
+Preflight also lists `first_run_setup`: the setup questions still open (contact email, optional OpenAlex
+key, Zotero), leaving out anything the user already set up or chose to skip. Do not ask them separately: put
+them in the intake message below, so a first run has one round of questions. Then:
 
-- **No OpenAlex key:** tell the user it is optional but makes lookups about 3 times faster with 10 times the
-  daily budget. You must not create the account for them (not even through OpenAlex's agent sign-up). They
-  sign up at https://openalex.org/signup, copy the key from https://openalex.org/settings/api-key, and run
-  `$PY $SK/scripts/configure.py openalex-key` in their own terminal, which stores it in the system
-  keychain. Never ask them to paste a key into the chat, and never write one into a file.
-- **No contact email:** ask which email to send to Crossref and OpenAlex, then
-  `$PY $SK/scripts/configure.py set-email <email>`.
-- **Zotero not ready:** the skill uses the Zotero desktop app as its paper library (`scripts/zotero_lib.py`).
-  Reading needs Zotero 7+ with the local API on; filing and cleaning papers needs Zotero 10+. Ask the user
-  to do what preflight lists (install or update Zotero, open it, turn on the local API). On the first write
-  Zotero shows an access dialog; tell the user to click "Always Allow". If they would rather not use Zotero,
-  continue without it.
+- **Email:** run `$PY $SK/scripts/configure.py set-email <email>` with the answer.
+- **OpenAlex key:** you must not create the account for them (not even through OpenAlex's agent sign-up),
+  never ask them to paste a key into the chat, and never write one into a file. They sign up, copy the key and
+  run `$PY $SK/scripts/configure.py openalex-key` in their own terminal (it stores the key in the system
+  keychain). Do not wait for it; the review runs without a key. If they say skip, run
+  `$PY $SK/scripts/configure.py skip openalex-key` so it is not offered again.
+- **Zotero:** reading needs Zotero 7+ with the local API on; filing and cleaning papers needs Zotero 10+. If
+  they do what preflight lists, rerun preflight. On the first write Zotero shows an access dialog; tell them
+  to click "Always Allow". If they say skip, run `$PY $SK/scripts/configure.py skip zotero` and continue
+  without it. `configure.py unskip <item>` offers it again.
 
 Registry answers are cached on disk (`~/.cache/detailed-paper-review/http-cache.sqlite`, 30 days) and every
 request is rate-limited per service, so reruns and later reviews do not repeat lookups.
@@ -93,7 +93,8 @@ user's original files are never modified.
 
 ## Intake: ask before starting
 
-Ask in one message, and wait for the answers. Skip anything the user already said. Then list what is still
+Ask in one message, and wait for the answers. Skip anything the user already said. Include the open
+`first_run_setup` questions from preflight in the same message, after the review questions. Then list what is still
 missing and needed, say what each missing item would let you check, and continue only with what you have
 (recording each gap so it appears under "could not check").
 
