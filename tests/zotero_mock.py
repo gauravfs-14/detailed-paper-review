@@ -61,6 +61,9 @@ def make_handler(lib):
             u = urllib.parse.urlsplit(self.path)
             q = dict(urllib.parse.parse_qsl(u.query))
             p = u.path
+            if p == "/_state":  # tests in other programs (Lexiq) inspect the library through this
+                return self._send(200, {"items": list(lib.items.values()), "collections": list(lib.collections.values()),
+                                        "writes": lib.writes})
             if p == "/connector/ping":
                 return self._send(200, b"ok", {"X-Zotero-Version": "10.0.7"})
             if p == "/api/":
@@ -90,6 +93,8 @@ def make_handler(lib):
         def do_POST(self):
             p = urllib.parse.urlsplit(self.path).path
             body = self._body()
+            if p == "/_seed":  # add items directly (not a Zotero endpoint)
+                return self._send(200, {"keys": [lib.add_item(it) for it in body]})
             if p == "/api/local/authorize":
                 return self._send(200, {"key": "test-key", "remember": True})
             if not self._authed():
@@ -133,3 +138,13 @@ def serve(delay=0.0):
     srv = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(lib))
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     return srv, lib, f"http://127.0.0.1:{srv.server_address[1]}"
+
+
+if __name__ == "__main__":
+    import argparse
+    ap = argparse.ArgumentParser(description="Run the simulated Zotero until killed; prints its URL.")
+    ap.add_argument("--delay", type=float, default=0.0)
+    a = ap.parse_args()
+    srv, _, url = serve(a.delay)
+    print(url, flush=True)
+    threading.Event().wait()
