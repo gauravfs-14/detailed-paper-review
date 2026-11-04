@@ -75,6 +75,8 @@ def make_handler(lib):
             m = re.fullmatch(r"/api/users/0/collections/(\w+)/items/top", p)
             if m:
                 return self._send(200, [{"key": k, "data": d} for k, d in lib.items.items() if m.group(1) in d["collections"]])
+            if p == "/api/users/0/items":
+                return self._send(200, [{"key": k, "data": d} for k, d in lib.items.items()][: int(q.get("limit") or 50)])
             if p == "/api/users/0/items/top":
                 time.sleep(lib.delay)
                 needle = (q.get("q") or "").lower()
